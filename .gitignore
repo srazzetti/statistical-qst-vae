@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+sda-env/
+
+# Directories with figures, data, and other resources
+figs/
