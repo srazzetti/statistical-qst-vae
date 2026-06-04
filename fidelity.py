@@ -80,3 +80,35 @@ def classical_fidelity(P_vae, P_exact, N):
         fc += np.sqrt(p_exact * p_vae)
     return fc
 
+def quantum_fidelity_pure(rho_vae, psi_exact):
+    """
+    Calcola la fedeltà quantistica nel caso in cui lo stato esatto sia puro.
+    rho_vae: matrice di densità 2^N x 2^N (Numpy array)
+    psi_exact: vettore di stato 2^N (Numpy array o Qiskit Statevector)
+    """
+    # Trasformiamo psi_exact in un vettore colonna e riga (bra e ket)
+    ket = np.array(psi_exact).reshape(-1, 1)
+    bra = ket.conj().T
+    
+    # Calcolo del sandwich: bra @ rho @ ket
+    fidelity = bra @ rho_vae @ ket
+    
+    # Il risultato è una matrice 1x1 complessa, estraiamo lo scalare reale
+    return np.real(fidelity[0, 0])
+
+from scipy.linalg import sqrtm
+
+def quantum_fidelity_general(rho_1, rho_2):
+    """
+    Formula generale di Jozsa per la fedeltà tra due matrici di densità qualsiasi.
+    F = [ Tr( sqrt( sqrt(rho_1) @ rho_2 @ sqrt(rho_1) ) ) ]^2
+    """
+    # Calcola la radice quadrata della prima matrice
+    sqrt_rho_1 = sqrtm(rho_1)
+    # Prodotto interno
+    inner_matrix = sqrt_rho_1 @ rho_2 @ sqrt_rho_1
+    # Radice quadrata del risultato
+    sqrt_inner = sqrtm(inner_matrix)
+    # Traccia al quadrato
+    fidelity = np.real(np.trace(sqrt_inner)) ** 2
+    return fidelity

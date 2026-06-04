@@ -37,9 +37,9 @@ from qiskit.quantum_info import Operator
 from qiskit_aer import AerSimulator
 
 # riusa l'unitario di Naimark a 1 qubit e il POVM tetraedrico
-from povm_naimark import build_naimark_unitary, M1
+from data.povm_naimark import build_naimark_unitary, M1
 # riusa utility già scritte e coerenti col paper
-from povm_sampling import samples_to_onehot, ghz_state_algebra, povm_probability
+from data.povm_sampling import samples_to_onehot, ghz_state_algebra, povm_probability
 
 
 # ── Stato di sistema: GHZ a N qubit ──────────────────────────────────────────
