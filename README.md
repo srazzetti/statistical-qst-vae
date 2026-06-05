@@ -28,10 +28,14 @@ i dati possono essere generati nei seguenti modi:
 
 TO DO:
 -
-- Nome progetto e repo
-- Definire stato di simulazione (GHZ 3 qubit(?))
+- Nome progetto e repo &#10004;
+- Definire stato di simulazione, alcune opzioni: 
+     - GHZ $\longrightarrow$ abbastanza semplice
+     - W $\longrightarrow$ come paper
+     - Dicke (?) $\longrightarrow$ da capire
+     - Werner (?) $\longrightarrow$ da capire
 - Preparare simulazione dati e quindi dataset (programmazione modulare)
-- analisi classica con MLE
-- classi e funzioni per VAE (fare affidamento, almeno in principio, a proposte paper su dimensioni + DeGuio per struttura)
+- Analisi classica con MLE
+- Classi e funzioni per VAE (fare affidamento, almeno in principio, a proposte paper su dimensioni + DeGuio per struttura)
 - Confronti statistici + fidelity (nb: con matrici è possibile stimare F_quantum, con distribuzioni VAE solo F_classica)
-- altro: idee su come rendere più "statistica" il progetto...
+- Altro: idee su come rendere più "statistica" il progetto...
