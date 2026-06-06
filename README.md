@@ -1,6 +1,8 @@
 # statistical-qst-vae
 Statistical methods for Quantum State Tomography: evaluating Maximum Likelihood Estimation and Variational Autoencoders
 
+Progetto finale per corso di Statistics and Data Analysis 2025-2026 (Università di Milano Bicocca - Corso di Laurea Magistrale in Fisica)
+
 Stati che sarebbe interessante simulare (esempi su 3 qubit N=3):
 - 
 - stato prodotto $\ket{+}\ket{+}\ket{+}$
