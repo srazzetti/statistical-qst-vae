@@ -1,119 +1,131 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
-POVM Tetraedrico: campionamento via algebra vs Qiskit
-======================================================
-
-Due approcci equivalenti per ottenere il "sample space" POVM
-di uno stato quantistico (es. GHZ a N qubit).
-
-APPROCCIO 1 — Algebra pura (numpy)
-    Costruiamo rho direttamente come matrice densità,
-    calcoliamo P(a) = Tr[M(a) @ rho] per ogni outcome,
-    poi campioniamo da quella distribuzione.
-
-APPROCCIO 2 — Qiskit
-    Prepariamo lo stato con un circuito Qiskit,
-    estraiamo rho tramite DensityMatrix,
-    poi stessa procedura algebrica per P(a).
-
-In entrambi i casi il campionamento finale è classico (numpy.random),
-perché stiamo simulando — non girando su hardware reale.
-Su hardware reale si userebbe il teorema di Naimark
-(vedi: arxiv.org/abs/1807.08449 e qiskit-community.github.io/povm-toolbox).
+Script: povm_sampling.py
+Author: Simone Razzetti
+Date: 6-6-2026
+Description: 
+    Functions for the sampling of tetraedric POVM possible outcomes, given a state rho and the exact 
+    distribution P(a) = Tr[M(a) @ rho].
+    Usefull functions:
+        povm_probability()
+        sample_povm()
+        samples_to_onehot()
+        onehot_to samples()
+        samples_to_empirical_dist()
 """
 
+# ----------------------------------------------------------------------------------------------------------------------------
+# Imports
+import numpy as np
+import matplotlib.pyplot as plt
 import numpy as np
 from itertools import product as iproduct
+from qiskit import QuantumCircuit
+from qiskit.quantum_info import DensityMatrix
+from qiskit.visualization import plot_state_city, plot_state_hinton, plot_state_qsphere
+from collections import Counter
 
-# ── Matrici di Pauli ────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------------------------------------------------------------
+# Costants
+
+# Pauli matrices
 I  = np.eye(2, dtype=complex)
 sx = np.array([[0, 1 ], [1,  0 ]], dtype=complex)
 sy = np.array([[0, -1j], [1j, 0]], dtype=complex)
 sz = np.array([[1, 0 ], [0, -1 ]], dtype=complex)
 
-# ── Direzioni tetraedriche (vertici tetraedro nella sfera di Bloch) ─────────
-# Riferimento: Renes et al. 2004, quant-ph/0310075
+# Tetrahedral directions (vertices of the SIC POVM on the Bloch sphere)
 S_VECS = np.array([
-    [ 0,             0,            1   ],   # polo nord
+    [ 0,             0,            1   ],   # north pole
     [ 2*np.sqrt(2)/3, 0,          -1/3 ],
     [-np.sqrt(2)/3,  np.sqrt(2/3), -1/3],
     [-np.sqrt(2)/3, -np.sqrt(2/3), -1/3],
 ])
 
-
-# ── Costruzione operatori POVM per un singolo qubit ──────────────────────────
 def make_povm_1qubit():
     """
-    Restituisce lista di 4 matrici 2x2: M[alpha] = (I + s[alpha]·sigma) / 4
-    Verifica: sum(M) == I  (completezza)
+    Returns a list of 4 matrices 2x2: M[alpha] = (I + s[alpha]·sigma) / 4
+    Verifies: sum(M) == I  (completeness)
     """
     M = [(I + s[0]*sx + s[1]*sy + s[2]*sz) / 4 for s in S_VECS]
-    assert np.allclose(sum(M), I), "POVM non completo!"
+    # np.allclose verifies the assertion is true with small tolerance, instead of '=='
+    assert np.allclose(sum(M), I), "POVM is not complete!"
     return M
 
+# ----------------------------------------------------------------------------------------------------------------------------
+# Functions and classes
 
-# ── POVM per N qubit: prodotto tensoriale ────────────────────────────────────
 def povm_probability(rho, N, M1=None):
     """
-    Calcola la distribuzione esatta P(a) = Tr[M(a1)⊗...⊗M(aN) @ rho]
-    per tutti i 4^N outcome possibili.
+    Compute the exact probability of each outcome a = (a1, ..., aN) of 4^N possible: 
+    P(a) = Tr[M(a1) x ... x M(aN) @ rho]
 
     Args:
-        rho : matrice densità (2^N x 2^N)
-        N   : numero di qubit
-        M1  : lista di 4 operatori POVM per singolo qubit (default: tetraedrico)
+        rho : density matrix to "measure" (2^N x 2^N)
+        N   : number of qubits
+        M1  : list of the 4 SIC POVM single qubit operators (default: tetraedric SIC POVM)
 
     Returns:
-        dict {(a1,...,aN): probabilità}
+        dict {(a1,...,aN): probability}
     """
+    # input sanity check 
+    expected_dim = 2**N
+    assert rho.shape == (expected_dim, expected_dim), f"rho dimensions {rho.shape} does not fit N = {N} qubits."
+        
     if M1 is None:
         M1 = make_povm_1qubit()
 
     P = {}
+    # iproduct is the inter-product of {0,1,2,3}x{0,1,3,4}..{0,1,2,3} N times 
+    # --> all possible outcomes (they are tuple)
     for outcome in iproduct(range(4), repeat=N):
-        # prodotto tensoriale M(a1) ⊗ M(a2) ⊗ ... ⊗ M(aN)
+        # tensor prod M(a) = M(a1) x M(a2) x ... x M(aN)
         op = M1[outcome[0]]
         for i in range(1, N):
             op = np.kron(op, M1[outcome[i]])
         # Born's rule: P(a) = Tr[M(a) @ rho]
         P[outcome] = float(np.real(np.trace(op @ rho)))
 
-    # piccole correzioni numeriche (probabilità negative vicinissime a 0)
+    # sanity check
+    # clip tiny negative probabilities to 0 due to floating-point imprecision    
     P = {k: max(v, 0.0) for k, v in P.items()}
-
-    # rinormalizza per sicurezza numerica
+    # renormalize the distribution to ensure the total sum equals exactly 1.0
     total = sum(P.values())
     P = {k: v / total for k, v in P.items()}
 
     return P
 
-
-# ── Campionamento da P(a) ────────────────────────────────────────────────────
-def sample_povm(P_exact, n_samples, seed=42):
+def sample_povm(P_exact, n_samples=1, seed=42):
     """
-    Simula n_samples misure POVM campionando dalla distribuzione esatta.
-    Ogni campione è una tupla (a1, a2, ..., aN) con ai in {0,1,2,3}.
+    Simulates n_samples measurements POVM sampling from the exact distribution.
+    Each sample is a tuple (a1, a2, ..., aN) with ai in {0,1,2,3}.
 
-    In un esperimento reale questo corrisponde a eseguire
-    n_samples volte la misura POVM sull'hardware.
+    This corresponds to measure POVM n_samples times on a real hardware.
+    (The "true" simulation of the measurement needs ancillas qubit -2- for each data qubit;
+    POVM is not a projector or a basis, need to "encode" the result in ancillas. See povm_naimark.py)
 
     Returns:
-        list di tuple, lunghezza n_samples
+        list of tuple, lenght n_samples
     """
+    # random number generator
     rng = np.random.default_rng(seed)
     outcomes = list(P_exact.keys())
     probs    = np.array(list(P_exact.values()))
     indices  = rng.choice(len(outcomes), size=n_samples, p=probs)
     return [outcomes[i] for i in indices]
 
-
-# ── Conversione sample -> one-hot (formato input VAE) ───────────────────────
 def samples_to_onehot(samples, N):
     """
-    Converte lista di tuple in matrice one-hot (n_samples x 4N).
-    Ogni qubit i con outcome a_i -> vettore one-hot di dim 4
-    posizionato nelle colonne [4i : 4i+4].
-
-    Es. N=3, outcome=(2,0,1) -> [0,0,1,0, 1,0,0,0, 0,1,0,0]
+    Transform list of tuple in one-hot matrix (n_samples, 4N).
+    Each qubit outcome ai --> one-hot label dim 4 in [4i : 4i+4]
+    Ex: N=3, outcome=(2,0,1) -> [0,0,1,0, 1,0,0,0, 0,1,0,0]
+    Args :
+        samples: list of tuple (a1, a2, ..., aN) with ai in {0,1,2,3}
+        N: number of qubits
+    
+    Returns: matrix (n_samples, 4N) of one-hot label 
     """
     n = len(samples)
     X = np.zeros((n, 4 * N), dtype=np.float32)
@@ -122,133 +134,90 @@ def samples_to_onehot(samples, N):
             X[row, qubit * 4 + a] = 1.0
     return X
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# APPROCCIO 1: algebra pura
-# ════════════════════════════════════════════════════════════════════════════
-
-def ghz_state_algebra(N):
+def onehot_to_samples(X, N):
     """
-    Costruisce la matrice densità dello stato GHZ a N qubit
-    direttamente con numpy.
-
-    |GHZ⟩ = (|00...0⟩ + |11...1⟩) / sqrt(2)
-    rho = |GHZ⟩⟨GHZ|
+    Inverse transformation of samples_to_onehot()
+    Args :
+        X: matrix (n_samples, 4N) of one-hot label (or softmax)
+        N: number of qubits
+    
+    Returns: list of tuple (a1, a2, ..., aN) with ai in {0,1,2,3}
     """
-    dim = 2**N
-    psi = np.zeros(dim, dtype=complex)
-    psi[0]    = 1 / np.sqrt(2)   # |00...0⟩
-    psi[-1]   = 1 / np.sqrt(2)   # |11...1⟩
-    rho = np.outer(psi, psi.conj())
-    return rho
+    samples = []
+    for row in X:
+        outcome = tuple(
+            np.argmax(row[qubit*4 : qubit*4 + 4])
+            for qubit in range(N)
+        )
+        samples.append(outcome)
+    return samples
 
-
-def approach_algebra(N, n_samples):
-    print(f"\n{'='*55}")
-    print(f"APPROCCIO 1: Algebra pura  (N={N}, n_samples={n_samples})")
-    print('='*55)
-
-    # 1. stato GHZ
-    rho = ghz_state_algebra(N)
-    print(f"rho shape: {rho.shape},  Tr(rho) = {np.real(np.trace(rho)):.6f}")
-
-    # 2. distribuzione esatta
-    P = povm_probability(rho, N)
-    print(f"Num outcome possibili: {len(P)}  (= 4^{N} = {4**N})")
-    print(f"Somma P(a): {sum(P.values()):.8f}")
-    print(f"Esempio P(0,0,...,0) = {P[tuple([0]*N)]:.6f}")
-
-    # 3. campionamento
-    samples = sample_povm(P, n_samples)
-    print(f"Primi 5 campioni: {samples[:5]}")
-
-    # 4. one-hot per VAE
-    X = samples_to_onehot(samples, N)
-    print(f"Shape matrice one-hot (input VAE): {X.shape}")
-
-    return rho, P, samples, X
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# APPROCCIO 2: Qiskit
-# ════════════════════════════════════════════════════════════════════════════
-
-def ghz_circuit_qiskit(N):
+def samples_to_empirical_dist(samples, N):
     """
-    Costruisce il circuito GHZ a N qubit con Qiskit.
-    H sul primo qubit, poi CNOT a cascata.
+    Estimate the empirical probability distribution P_empirical(a) from the frequencies of collected 
+    experimental samples. Outcomes that never occurred are explicitly assigned a probability of 0.0.
     """
-    from qiskit import QuantumCircuit
-    qc = QuantumCircuit(N)
+    counts = Counter(samples)
+    total = len(samples)
+    P_empirical = {
+        outcome: counts.get(outcome, 0) / total
+        for outcome in iproduct(range(4), repeat=N)
+    }
+    return P_empirical
+
+# ----------------------------------------------------------------------------------------------------------------------------
+# debug - test 
+
+def create_ghz_state(n_qubits):
+    qc = QuantumCircuit(n_qubits)
     qc.h(0)
-    for i in range(N - 1):
-        qc.cx(i, i + 1)
+    for i in range(1, n_qubits):
+        qc.cx(0, i)
+    # qc.measure_all()
     return qc
 
+def debug (plot=False, data_processing=False, data_dist=False) :
+    qc = create_ghz_state(3)
+    rho = DensityMatrix(qc)
 
-def approach_qiskit(N, n_samples):
-    print(f"\n{'='*55}")
-    print(f"APPROCCIO 2: Qiskit        (N={N}, n_samples={n_samples})")
-    print('='*55)
+    if plot: 
+        print(rho.data)
+        # possible visualizations of the density matrix
+        # 3d heatmap, real and imag parts
+        fig_city = plot_state_city(rho)
+        fig_city.suptitle("City Plot")  
 
-    from qiskit.quantum_info import DensityMatrix
+        # 2d heatmap, real and imag parts
+        fig_hinton = plot_state_hinton(rho)
+        fig_hinton.suptitle("Hinton Diagram")                
 
-    # 1. circuito e matrice densità
-    qc = ghz_circuit_qiskit(N)
-    print(qc.draw())
-    rho = DensityMatrix(qc).data
-    print(f"rho shape: {rho.shape},  Tr(rho) = {np.real(np.trace(rho)):.6f}")
+        # Plots the multi-qubit state on a sphere where each node is a basis state.
+        # Node size is proportional to probability; node color represents phase. Link represents the entanglement.
+        fig_qsphere = plot_state_qsphere(rho)
+        fig_qsphere.suptitle("Q-Sphere dello Stato Globale")  
 
-    # 2. distribuzione esatta (stessa procedura algebrica)
-    P = povm_probability(rho, N)
-    print(f"Num outcome possibili: {len(P)}  (= 4^{N} = {4**N})")
-    print(f"Somma P(a): {sum(P.values()):.8f}")
-    print(f"Esempio P(0,0,...,0) = {P[tuple([0]*N)]:.6f}")
+        print("Close all the figures to close the script.")
+        plt.show()
+    
+    prob = povm_probability(rho.data, 3)
+    # print(prob)
+    sample = sample_povm(prob, seed=None)
+    print(sample)
 
-    # 3. campionamento
-    samples = sample_povm(P, n_samples)
-    print(f"Primi 5 campioni: {samples[:5]}")
+    if data_processing:
+        one_hot = samples_to_onehot(sample, 3)
+        print(one_hot)
+        back_sample = onehot_to_samples(one_hot, 3)
+        print(back_sample)
 
-    # 4. one-hot per VAE
-    X = samples_to_onehot(samples, N)
-    print(f"Shape matrice one-hot (input VAE): {X.shape}")
+    if data_dist:
+        samples = sample_povm(prob, 1000)
+        p_emp = samples_to_empirical_dist(samples, 3)
+        for k in prob.keys():
+            print(prob[k], p_emp[k])
+    return
 
-    return rho, P, samples, X
+# ----------------------------------------------------------------------------------------------------------------------------
+if __name__ == "__main__": 
+    debug ()
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# Confronto: i due approcci devono dare P identiche
-# ════════════════════════════════════════════════════════════════════════════
-
-def compare_approaches(N):
-    print(f"\n{'='*55}")
-    print(f"CONFRONTO tra i due approcci (N={N})")
-    print('='*55)
-
-    rho_alg = ghz_state_algebra(N)
-    P_alg   = povm_probability(rho_alg, N)
-
-    from qiskit.quantum_info import DensityMatrix
-    qc      = ghz_circuit_qiskit(N)
-    rho_qk  = DensityMatrix(qc).data
-    P_qk    = povm_probability(rho_qk, N)
-
-    # confronta le distribuzioni
-    max_diff = max(abs(P_alg[k] - P_qk[k]) for k in P_alg)
-    print(f"Max differenza tra P_algebra e P_qiskit: {max_diff:.2e}")
-    print(f"Approcci equivalenti: {np.isclose(max_diff, 0, atol=1e-10)}")
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# Main
-# ════════════════════════════════════════════════════════════════════════════
-
-if __name__ == "__main__":
-    N         = 3
-    N_SAMPLES = 1000
-
-    rho1, P1, s1, X1 = approach_algebra(N, N_SAMPLES)
-    rho2, P2, s2, X2 = approach_qiskit(N, N_SAMPLES)
-    compare_approaches(N)
-
-    print("\nDone. X1 e X2 sono pronti come input per il VAE.")
