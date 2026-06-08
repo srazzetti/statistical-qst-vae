@@ -185,9 +185,25 @@ Per le proprietà algebriche intrinseche del prodotto $T^\dagger T$, la matrice 
 
 ### B. La Funzione di Log-Likelihood Quantistica
 
-Dato un insieme di conteggi sperimentali discreti $n_{\mathbf{a}}$ registrati per ciascuno dei $4^N$ esiti della POVM globale (con $\sum_{\mathbf{a}} n_{\mathbf{a}} = N_s$ shots totali), la probabilità di osservare tale specifica combinazione segue una distribuzione multinomiale governata dalle probabilità teoriche Born $p_{\mathbf{a}}(\vec{t}) = \text{Tr}\left( M^{(\mathbf{a})} \rho(\vec{t}) \right)$.
+Dato un insieme di conteggi sperimentali discreti $n_{\mathbf{a}}$ registrati per ciascuno dei $4^N$ esiti della POVM globale (sotto il vincolo di $N_s = \sum_{\mathbf{a}} n_{\mathbf{a}}$ shots totali), l'obiettivo della tomografia quantistica è stimare lo stato $\rho$ più compatibile con tali osservazioni.
 
-Escludendo i fattori combinatori costanti, si applica il logaritmo naturale per trasformare la produttoria in una sommatoria computazionalmente stabile e si inverte il segno. Il problema MLE si riduce formalmente alla **minimizzazione della Negative Log-Likelihood** ($\mathcal{L}$) [3]:
+Dal punto di vista statistico, ipotizzando che gli $N_s$ esperimenti siano indipendenti e identicamente distribuiti (i.i.d.), la probabilità di osservare l'intera sequenza di conteggi sperimentali $\{n_{\mathbf{a}}\}$ è descritta rigorosamente dalla **distribuzione multinomiale**:
+
+$$P(\{n_{\mathbf{a}}\} \,|\, \vec{t}) = \frac{N_s!}{\prod_{\mathbf{a}=1}^{4^N} n_{\mathbf{a}}!} \prod_{\mathbf{a}=1}^{4^N} \left[ p_{\mathbf{a}}(\vec{t}) \right]^{n_{\mathbf{a}}}$$
+
+La formula si compone di due parti fondamentali:
+1. **Il coefficiente multinomiale** $\frac{N_s!}{\prod n_{\mathbf{a}}!}$: rappresenta il fattore combinatorio, ovvero il numero di modi distinti in cui gli $N_s$ eventi possono combinarsi per generare quella specifica distribuzione di conteggi.
+2. **La produttoria delle probabilità** $\prod [p_{\mathbf{a}}]^{n_{\mathbf{a}}}$: esprime la probabilità di una specifica sequenza di esiti, dove ciascuna probabilità teorica $p_{\mathbf{a}}(\vec{t}) = \text{Tr}\left( M^{(\mathbf{a})} \rho(\vec{t}) \right)$ (dettata dalla regola di Born) è elevata al numero di volte $n_{\mathbf{a}}$ in cui l'esito si è effettivamente verificato. Il vettore $\vec{t}$ contiene i parametri reali che garantiscono la fisicità della matrice densità $\rho$.
+
+Nell'approccio di Massima Verosimiglianza (MLE), questa probabilità viene trattata come una funzione dei parametri dello stato, definendo la funzione di **Likelihood** $L(\vec{t}) \equiv P(\{n_{\mathbf{a}}\} \,|\, \vec{t})$. Al fine di massimizzarla computazionalmente, si applica il logaritmo naturale ($\ln$), ottenendo la Log-Likelihood:
+
+$$\ln L(\vec{t}) = \ln \left( \frac{N_s!}{\prod_{\mathbf{a}=1}^{4^N} n_{\mathbf{a}}!} \right) + \ln \left( \prod_{\mathbf{a}=1}^{4^N} \left[ p_{\mathbf{a}}(\vec{t}) \right]^{n_{\mathbf{a}}} \right)$$
+
+Sfruttando le proprietà dei logaritmi, l'equazione si semplifica drasticamente attraverso due passaggi chiave:
+* **Scomparsa del coefficiente combinatorio:** Il termine $\ln \left( \frac{N_s!}{\prod n_{\mathbf{a}}!} \right)$ dipende esclusivamente dai dati raccolti in laboratorio e dal numero di shots, risultando costante rispetto ai parametri fisici dello stato $\vec{t}$. Poiché l'algoritmo di ottimizzazione deve variare solo $\vec{t}$ per trovare l'estremo, questa costante additiva può essere completamente omessa senza alterare la posizione del punto di ottimo.
+* **Scomposizione della produttoria:** Il logaritmo trasforma la produttoria rimasta in una sommatoria ($\ln(A \cdot B) = \ln A + \ln B$). Contemporaneamente, l'esponente $n_{\mathbf{a}}$ "scende" diventando un coefficiente moltiplicativo in virtù della proprietà delle potenze ($\ln(A^B) = B \ln A$). L'esito $n_{\mathbf{a}}$ agisce così da vero e proprio peso statistico nella sommatoria.
+
+Infine, per uniformare il problema agli standard della programmazione numerica (che predilige la ricerca di minimi rispetto ai massimi), si inverte il segno della funzione. Il problema MLE si riduce formalmente alla **minimizzazione della Negative Log-Likelihood** ($\mathcal{L}$):
 
 $$\min_{\vec{t}} \mathcal{L}(\vec{t}) = - \sum_{\mathbf{a}=1}^{4^N} n_{\mathbf{a}} \ln \left[ \text{Tr}\left( M^{(\mathbf{a})} \rho(\vec{t}) \right) \right]$$
 

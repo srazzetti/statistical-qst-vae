@@ -20,7 +20,6 @@ Description:
 # Imports
 import numpy as np
 import matplotlib.pyplot as plt
-import numpy as np
 from itertools import product as iproduct
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import DensityMatrix
@@ -63,7 +62,7 @@ def povm_probability(rho, N, M1=None):
     P(a) = Tr[M(a1) x ... x M(aN) @ rho]
 
     Args:
-        rho : density matrix to "measure" (2^N x 2^N)
+        rho : density matrix to "measure" (2^N x 2^N) - rho.data if rho is DensityMatrix class
         N   : number of qubits
         M1  : list of the 4 SIC POVM single qubit operators (default: tetraedric SIC POVM)
 
@@ -166,7 +165,7 @@ def samples_to_empirical_dist(samples, N):
     return P_empirical
 
 # ----------------------------------------------------------------------------------------------------------------------------
-# debug - test 
+# debug - test : useless functions, only for testing
 
 def create_ghz_state(n_qubits):
     qc = QuantumCircuit(n_qubits)
@@ -176,7 +175,7 @@ def create_ghz_state(n_qubits):
     # qc.measure_all()
     return qc
 
-def debug (plot=False, data_processing=False, data_dist=False) :
+def debug_povm (plot=False, data_processing=False, data_dist=False) :
     qc = create_ghz_state(3)
     rho = DensityMatrix(qc)
 
@@ -219,5 +218,5 @@ def debug (plot=False, data_processing=False, data_dist=False) :
 
 # ----------------------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__": 
-    debug ()
+    debug_povm ()
 
