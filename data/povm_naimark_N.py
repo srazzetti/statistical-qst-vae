@@ -37,9 +37,9 @@ from qiskit.quantum_info import Operator
 from qiskit_aer import AerSimulator
 
 # riusa l'unitario di Naimark a 1 qubit e il POVM tetraedrico
-from data.povm_naimark import build_naimark_unitary, M1
+from povm_naimark import build_naimark_unitary, M1
 # riusa utility già scritte e coerenti col paper
-from data.povm_sampling_test import samples_to_onehot, ghz_state_algebra, povm_probability
+from src.povm_sampling import samples_to_onehot, povm_probability  #DA CAPIRE: ghz_state_algebra non c'è in povm_sampling.py, va definita anche lì? oppure la sposto qui? Per ora sposto qui poi vediamo
 
 
 # ── Stato di sistema: GHZ a N qubit ──────────────────────────────────────────
@@ -51,6 +51,21 @@ def ghz_circuit(N):
         qc.cx(i, i + 1)
     return qc
 
+# ── Costruzione di \rho in maniera algebrica ──────────────────────────────
+def ghz_state_algebra(N):
+    """
+    Costruisce la matrice densità dello stato GHZ a N qubit
+    direttamente con numpy.
+
+    |GHZ⟩ = (|00...0⟩ + |11...1⟩) / sqrt(2)
+    rho = |GHZ⟩⟨GHZ|
+    """
+    dim = 2**N
+    psi = np.zeros(dim, dtype=complex)
+    psi[0]    = 1 / np.sqrt(2)   # |00...0⟩
+    psi[-1]   = 1 / np.sqrt(2)   # |11...1⟩
+    rho = np.outer(psi, psi.conj())
+    return rho
 
 # ── Costruzione del circuito dilatato a N qubit ──────────────────────────────
 def build_naimark_circuit_Nqubit(state_circuit, N, U_naimark):
@@ -149,8 +164,8 @@ def classical_fidelity(P_emp, P_exact):
 # Demo
 # ════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
-    N       = 8
-    N_SHOTS = 20000
+    N       = 3   # numero di qubit di sistema (e quindi di outcome congiunto)
+    N_SHOTS = 200000
 
     print("=" * 60)
     print(f"Naimark a N qubit (N={N}, shots={N_SHOTS})")
@@ -168,6 +183,16 @@ if __name__ == "__main__":
 
     # 3. one-hot pronto per il VAE (stesso formato di povm_sampling.py)
     X = samples_to_onehot(samples, N)
+    # Stampo il vettore one-hot per le prime 5 misure, per verificare che sia coerente con i campioni
+    print("\nVettori one-hot per i primi 5 campioni:")
+    for i in range(5):
+        print(f"Campione {i}: {samples[i]} -> One-hot: {X[i]}")
+        # Salvo i vettori one-hot in un file .txt per poterli usare come input del VAE in un secondo momento
+        with open(f"onehot_samples_N{N}_shots{N_SHOTS}", "w") as f:
+            for row in X:
+                row = [str(int(x)) for x in row]  # converto i valori booleani in stringhe "0" o "1"
+                f.write("".join(map(str, row)) + "\n")
+
     print(f"Shape matrice one-hot (input VAE): {X.shape}  (atteso: ({N_SHOTS}, {4 * N}))")
 
     # 4. verifica contro la distribuzione esatta algebrica
