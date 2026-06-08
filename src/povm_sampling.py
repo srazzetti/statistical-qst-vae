@@ -18,45 +18,22 @@ Description:
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Imports
+
 import numpy as np
 import matplotlib.pyplot as plt
 from itertools import product as iproduct
-from qiskit import QuantumCircuit
-from qiskit.quantum_info import DensityMatrix
-from qiskit.visualization import plot_state_city, plot_state_hinton, plot_state_qsphere
 from collections import Counter
+# personal helper
+from src.utils import *
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Costants
 
-# Pauli matrices
-I  = np.eye(2, dtype=complex)
-sx = np.array([[0, 1 ], [1,  0 ]], dtype=complex)
-sy = np.array([[0, -1j], [1j, 0]], dtype=complex)
-sz = np.array([[1, 0 ], [0, -1 ]], dtype=complex)
-
-# Tetrahedral directions (vertices of the SIC POVM on the Bloch sphere)
-S_VECS = np.array([
-    [ 0,             0,            1   ],   # north pole
-    [ 2*np.sqrt(2)/3, 0,          -1/3 ],
-    [-np.sqrt(2)/3,  np.sqrt(2/3), -1/3],
-    [-np.sqrt(2)/3, -np.sqrt(2/3), -1/3],
-])
-
-def make_povm_1qubit():
-    """
-    Returns a list of 4 matrices 2x2: M[alpha] = (I + s[alpha]·sigma) / 4
-    Verifies: sum(M) == I  (completeness)
-    """
-    M = [(I + s[0]*sx + s[1]*sy + s[2]*sz) / 4 for s in S_VECS]
-    # np.allclose verifies the assertion is true with small tolerance, instead of '=='
-    assert np.allclose(sum(M), I), "POVM is not complete!"
-    return M
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Functions and classes
 
-def povm_probability(rho, N, M1=None):
+def povm_probability(rho, N, povm_dict=None):
     """
     Compute the exact probability of each outcome a = (a1, ..., aN) of 4^N possible: 
     P(a) = Tr[M(a1) x ... x M(aN) @ rho]
@@ -64,7 +41,7 @@ def povm_probability(rho, N, M1=None):
     Args:
         rho : density matrix to "measure" (2^N x 2^N) - rho.data if rho is DensityMatrix class
         N   : number of qubits
-        M1  : list of the 4 SIC POVM single qubit operators (default: tetraedric SIC POVM)
+        povm_dict : {outcome_tuple : POVM_operator (kron prod of single qubit SIC-POVM) }
 
     Returns:
         dict {(a1,...,aN): probability}
@@ -72,20 +49,15 @@ def povm_probability(rho, N, M1=None):
     # input sanity check 
     expected_dim = 2**N
     assert rho.shape == (expected_dim, expected_dim), f"rho dimensions {rho.shape} does not fit N = {N} qubits."
-        
-    if M1 is None:
-        M1 = make_povm_1qubit()
 
     P = {}
-    # iproduct is the inter-product of {0,1,2,3}x{0,1,3,4}..{0,1,2,3} N times 
-    # --> all possible outcomes (they are tuple)
-    for outcome in iproduct(range(4), repeat=N):
-        # tensor prod M(a) = M(a1) x M(a2) x ... x M(aN)
-        op = M1[outcome[0]]
-        for i in range(1, N):
-            op = np.kron(op, M1[outcome[i]])
+
+    if povm_dict is None:
+        povm_dict = build_povm(N)
+    
+    for outcome, op in povm_dict.items():
         # Born's rule: P(a) = Tr[M(a) @ rho]
-        P[outcome] = float(np.real(np.trace(op @ rho)))
+        P[outcome] = float(np.real(np.trace(op @ rho)))        
 
     # sanity check
     # clip tiny negative probabilities to 0 due to floating-point imprecision    
@@ -165,58 +137,62 @@ def samples_to_empirical_dist(samples, N):
     return P_empirical
 
 # ----------------------------------------------------------------------------------------------------------------------------
-# debug - test : useless functions, only for testing
-
-def create_ghz_state(n_qubits):
-    qc = QuantumCircuit(n_qubits)
-    qc.h(0)
-    for i in range(1, n_qubits):
-        qc.cx(0, i)
-    # qc.measure_all()
-    return qc
-
-def debug_povm (plot=False, data_processing=False, data_dist=False) :
-    qc = create_ghz_state(3)
-    rho = DensityMatrix(qc)
-
-    if plot: 
-        print(rho.data)
-        # possible visualizations of the density matrix
-        # 3d heatmap, real and imag parts
-        fig_city = plot_state_city(rho)
-        fig_city.suptitle("City Plot")  
-
-        # 2d heatmap, real and imag parts
-        fig_hinton = plot_state_hinton(rho)
-        fig_hinton.suptitle("Hinton Diagram")                
-
-        # Plots the multi-qubit state on a sphere where each node is a basis state.
-        # Node size is proportional to probability; node color represents phase. Link represents the entanglement.
-        fig_qsphere = plot_state_qsphere(rho)
-        fig_qsphere.suptitle("Q-Sphere dello Stato Globale")  
-
-        print("Close all the figures to close the script.")
-        plt.show()
-    
-    prob = povm_probability(rho.data, 3)
-    # print(prob)
-    sample = sample_povm(prob, seed=None)
-    print(sample)
-
-    if data_processing:
-        one_hot = samples_to_onehot(sample, 3)
-        print(one_hot)
-        back_sample = onehot_to_samples(one_hot, 3)
-        print(back_sample)
-
-    if data_dist:
-        samples = sample_povm(prob, 1000)
-        p_emp = samples_to_empirical_dist(samples, 3)
-        for k in prob.keys():
-            print(prob[k], p_emp[k])
-    return
-
-# ----------------------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__": 
+
+    # debug - test : useless functions, only for testing
+    from qiskit import QuantumCircuit
+    from qiskit.quantum_info import DensityMatrix
+    from qiskit.visualization import plot_state_city, plot_state_hinton, plot_state_qsphere
+
+    def create_ghz_state(n_qubits):
+        qc = QuantumCircuit(n_qubits)
+        qc.h(0)
+        for i in range(1, n_qubits):
+            qc.cx(0, i)
+        # qc.measure_all()
+        return qc
+
+    def debug_povm (plot=False, data_processing=False, data_dist=False) :
+        qc = create_ghz_state(3)
+        rho = DensityMatrix(qc)
+
+        if plot: 
+            print(rho.data)
+            # possible visualizations of the density matrix
+            # 3d heatmap, real and imag parts
+            fig_city = plot_state_city(rho)
+            fig_city.suptitle("City Plot")  
+
+            # 2d heatmap, real and imag parts
+            fig_hinton = plot_state_hinton(rho)
+            fig_hinton.suptitle("Hinton Diagram")                
+
+            # Plots the multi-qubit state on a sphere where each node is a basis state.
+            # Node size is proportional to probability; node color represents phase. Link represents the entanglement.
+            fig_qsphere = plot_state_qsphere(rho)
+            fig_qsphere.suptitle("Q-Sphere dello Stato Globale")  
+
+            print("Close all the figures to close the script.")
+            plt.show()
+        
+        prob = povm_probability(rho.data, 3)
+        # print(prob)
+        sample = sample_povm(prob, seed=None)
+        print(sample)
+
+        if data_processing:
+            one_hot = samples_to_onehot(sample, 3)
+            print(one_hot)
+            back_sample = onehot_to_samples(one_hot, 3)
+            print(back_sample)
+
+        if data_dist:
+            samples = sample_povm(prob, 1000)
+            p_emp = samples_to_empirical_dist(samples, 3)
+            for k in prob.keys():
+                print(prob[k], p_emp[k])
+        return
+
+    # debug main:
     debug_povm ()
 

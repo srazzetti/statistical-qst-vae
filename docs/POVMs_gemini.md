@@ -182,6 +182,10 @@ L'operatore di densità candidato viene generato attraverso il prodotto operator
 $$\rho(\vec{t}) = \frac{T^\dagger(\vec{t}) T(\vec{t})}{\text{Tr}\left( T^\dagger(\vec{t}) T(\vec{t}) \right)}$$
 
 Per le proprietà algebriche intrinseche del prodotto $T^\dagger T$, la matrice risultante $\rho(\vec{t})$ è strutturalmente **semidefinita positiva e a traccia unitaria** indipendentemente dai valori numerici di $\vec{t}$. Questo trasforma un problema di ottimizzazione vincolata in un problema di **ottimizzazione libera (non vincolata)** nello spazio dei parametri reali $\vec{t}$.
+Garantisce per costruzione:
+  - hermitiana  (T T† è sempre hermitiana)
+  - semidefinita positiva  (T T† >= 0 per qualsiasi T)
+  - traccia 1  (normalizzazione esplicita)
 
 ### B. La Funzione di Log-Likelihood Quantistica
 
