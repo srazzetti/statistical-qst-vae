@@ -2,19 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Script: utils.py
-Author: Simone Razzetti, Riccardo Ruggeri
-Date: 
-Description: 
-    Provide all recurrent functions, constants and usefull helper.
-    Usefull functions:
-        build_povm()
-        classical_fidelity()
-        quantum_fidelity()
-        get_overlap_matrix()
-        pvec_from_pdict()
-        reconstruct_rho()
-        validate_rho()
+test
 """
 
 # ----------------------------------------------------------------------------------------------------------------------------
@@ -174,7 +162,114 @@ def validate_rho(rho, tol=1e-6):
     print(f"  Pos semi-definite:  {is_psd}  (min eigval = {min(eigvals):.2e})")
     return is_hermitian and abs(trace - 1) < tol and is_psd
 
+# ── Versione originale (per benchmark) ───────────────────────────────────────
+
+def get_overlap_matrix_and_inverse_original(M_local, n_qubits):
+    """Versione originale — doppio loop esplicito."""
+    T_local = np.zeros((4, 4))
+    for a in range(4):
+        for ap in range(4):
+            T_local[a, ap] = np.real(np.trace(M_local[a] @ M_local[ap]))
+    T_global = T_local
+    for _ in range(n_qubits - 1):
+        T_global = np.kron(T_global, T_local)
+    return T_global, np.linalg.inv(T_global)
+
+
+def reconstruct_density_matrix_original(P_vector, M_local, n_qubits, T_global_inv):
+    """Versione originale — doppio loop O(16^N)."""
+    dim_rho      = 2 ** n_qubits
+    rho          = np.zeros((dim_rho, dim_rho), dtype=complex)
+    num_outcomes = 4 ** n_qubits
+    M_global_list = []
+    for idx in range(num_outcomes):
+        temp, digits = idx, []
+        for _ in range(n_qubits):
+            digits.append(temp % 4); temp //= 4
+        M_g = M_local[digits[0]]
+        for d in digits[1:]: M_g = np.kron(M_g, M_local[d])
+        M_global_list.append(M_g)
+    for a in range(num_outcomes):
+        if P_vector[a] == 0: continue
+        for ap in range(num_outcomes):
+            coeff = P_vector[a] * T_global_inv[a, ap]
+            rho  += coeff * M_global_list[ap]
+    return rho
 
 # ----------------------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__": 
     print('utils.py has no main')
+    import time
+    from qiskit.quantum_info import state_fidelity, DensityMatrix
+
+    print("=" * 60)
+    print("Ricostruzione rho da P esatta (Eq. 5)")
+    print("=" * 60)
+
+    # ── correttezza e fidelity ────────────────────────────────────────────
+    for N in [2, 3, 4]:
+        dim = 2**N
+        print(f"\nN={N} qubit  (dim rho={dim}x{dim}, outcomes={4**N})")
+
+        psi      = np.zeros(dim, dtype=complex)
+        psi[0]   = psi[-1] = 1 / np.sqrt(2)
+        rho_true = np.outer(psi, psi.conj())
+        povm_dict = build_povm(N)
+
+        P_dict = {}
+        for outcome in iproduct(range(4), repeat=N):
+            op = M1[outcome[0]]
+            for i in range(1, N): op = np.kron(op, M1[outcome[i]])
+            P_dict[outcome] = np.real(np.trace(op @ rho_true))
+        P_vec    = pvec_from_pdict(P_dict, N)
+        T, T_inv = get_overlap_matrix(N)
+
+        t0      = time.time()
+        rho_rec = reconstruct_rho(P_vec, N, T_inv, povm_dict)
+        t1      = time.time()
+
+        validate_rho(rho_rec)
+        fq = state_fidelity(DensityMatrix(rho_true), DensityMatrix(rho_rec))
+        print(f"  F_q (P esatta):      {fq:.10f}  (deve essere 1.0)")
+        print(f"  Tempo:               {(t1-t0)*1000:.1f} ms")
+
+    # ── benchmark originale vs nuova ──────────────────────────────────────
+    print(f"\n{'=' * 60}")
+    print("Benchmark: originale (doppio loop) vs nuova (loop singolo)")
+    print(f"{'=' * 60}")
+    print(f"{'N':>3}  {'Originale':>12}  {'Nuova':>10}  {'Speedup':>8}  {'Match':>6}")
+    print("-" * 50)
+
+    for N in [2, 3, 4, 5]:
+        dim = 2**N
+        psi      = np.zeros(dim, dtype=complex)
+        psi[0]   = psi[-1] = 1 / np.sqrt(2)
+        rho_true = np.outer(psi, psi.conj())
+        povm_dict = build_povm(N)
+
+        P_dict = {}
+        for outcome in iproduct(range(4), repeat=N):
+            op = M1[outcome[0]]
+            for i in range(1, N): op = np.kron(op, M1[outcome[i]])
+            P_dict[outcome] = np.real(np.trace(op @ rho_true))
+        P_vec    = pvec_from_pdict(P_dict, N)
+        T, T_inv = get_overlap_matrix(N)
+
+        # originale (skip N=5: troppo lento)
+        if N <= 5:
+            t0       = time.time()
+            rho_orig = reconstruct_density_matrix_original(P_vec, M1, N, T_inv)
+            t_orig   = (time.time() - t0) * 1000
+        else:
+            t_orig   = None
+            rho_orig = None
+
+        # nuova
+        t0      = time.time()
+        rho_new = reconstruct_rho(P_vec, N, T_inv, povm_dict)
+        t_new   = (time.time() - t0) * 1000
+
+        match   = np.allclose(rho_orig, rho_new, atol=1e-10) if rho_orig is not None else "N/A"
+        speedup = f"{t_orig/t_new:.1f}x" if t_orig is not None else ">>10x"
+        orig_s  = f"{t_orig:.1f} ms" if t_orig is not None else "troppo lento"
+        print(f"{N:>3}  {orig_s:>12}  {t_new:>8.1f} ms  {speedup:>8}  {str(match):>6}")
