@@ -1,28 +1,34 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Script: stateprep.py
+Author: Riccardo Ruggeri, Simone Razzetti
+Description: 
+    Generation and validation possible states. Usefull functions to apply noise channels to 
+    pure states (matrices).
+"""
+
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 from qiskit import QuantumCircuit
 from qiskit.primitives import StatevectorSampler
+from qiskit.quantum_info import DensityMatrix
 from qiskit.visualization import plot_histogram
+from qiskit_aer.noise import phase_damping_error, amplitude_damping_error, depolarizing_error
 
-figs = Path("states/figs")
-figs.mkdir(parents=True, exist_ok=True)
+# ----------------------------------------------------------------------------------------------------------------------------
+# Functions
 
+# figs = Path("figs/states")
+# figs.mkdir(parents=True, exist_ok=True)
 
-# Functions to create GHZ and W states, both as state preparation circuits and as full circuits with measurement.
 def create_ghz_state(n_qubits):
     qc = QuantumCircuit(n_qubits)
     qc.h(0)
     for i in range(1, n_qubits):
         qc.cx(0, i)
-    return qc
-
-def create_ghz_circuit(n_qubits):
-    qc = QuantumCircuit(n_qubits)
-    qc.h(0)
-    for i in range(1, n_qubits):
-        qc.cx(0, i)
-    qc.measure_all()
     return qc
 
 def create_w_state(n_qubits):
@@ -33,46 +39,128 @@ def create_w_state(n_qubits):
     qc.initialize(w_vector, range(n_qubits))
     return qc
 
-def create_w_circuit(n_qubits):
-    qc = QuantumCircuit(n_qubits)
-    qc.ry(2 * np.arccos(np.sqrt(1 / n_qubits)), 0)
-    for k in range(1, n_qubits):
-        angle = 2 * np.arccos(np.sqrt(1 / (n_qubits - k)))
-        qc.cry(angle, k - 1, k)
-        qc.cx(k, k - 1)
-    qc.measure_all()
-    return qc
+# Noise channels --> necessary to study mixed states
+def apply_phase_damping(rho: DensityMatrix, gamma: float) -> DensityMatrix:
+    """
+    Apply a Phase Damping channel (pure dephasing) to all qubits in the density matrix.
+    This noise channel models the loss of quantum coherence (dephasing) without
+    any energy exchange with the environment, damping the off-diagonal elements.
+    Args:
+        rho (DensityMatrix): The input quantum state density matrix.
+        gamma (float): The noise parameter (0.0 <= gamma <= 1.0).
+    Returns:
+        DensityMatrix: The noisy mixed state after dephasing.
+    """
+    if gamma == 0.0:
+        return rho
+    # In Qiskit Aer si usa phase_damping_error
+    noise_channel = phase_damping_error(gamma)
+    for q in range(rho.num_qubits):
+        rho = rho.evolve(noise_channel, qargs=[q])
+    return rho
 
+def apply_amplitude_damping(rho: DensityMatrix, gamma: float) -> DensityMatrix:
+    """
+    Apply an Amplitude Damping channel (energy relaxation) to all qubits in the density matrix.
+    This noise channel models energy dissipation, causing the excited state 
+    to decay back to the ground state with a probability gamma.
+    Args:
+        rho (DensityMatrix): The input quantum state density matrix.
+        gamma (float): The relaxation probability (0.0 <= gamma <= 1.0).
+    Returns:
+        DensityMatrix: The noisy mixed state after thermal relaxation.
+    """
+    if gamma == 0.0:
+        return rho
+    # In Qiskit Aer si usa amplitude_damping_error
+    noise_channel = amplitude_damping_error(gamma)
+    for q in range(rho.num_qubits):
+        rho = rho.evolve(noise_channel, qargs=[q])
+    return rho
 
-def main():
-    n_qubits = 5
-    shots = 1000000
+def apply_depolarizing_noise(rho: DensityMatrix, param: float) -> DensityMatrix:
+    """
+    Apply a Depolarizing noise channel to all qubits in the density matrix.
+    This channel replaces the single-qubit state with the maximally mixed state 
+    I/2 with probability param, acting as an isotropic error model.
+    Args:
+        rho (DensityMatrix): The input quantum state density matrix.
+        param (float): The depolarizing error parameter (0.0 <= param <= 4/3).
+    Returns:
+        DensityMatrix: The noisy mixed state after depolarization.
+    """
+    if param == 0.0:
+        return rho
+    # In Qiskit Aer si usa depolarizing_error
+    noise_channel = depolarizing_error(param, num_qubits=1)
+    for q in range(rho.num_qubits):
+        rho = rho.evolve(noise_channel, qargs=[q])
+    return rho
+
+# ----------------------------------------------------------------------------------------------------------------------------
+if __name__ == "__main__": 
+    # debug-test
+    n_qubits = 3
+    shots = 10000
     sampler = StatevectorSampler()
 
-    # GHZ circuit
-    fig = create_ghz_circuit(n_qubits).draw(output='mpl')
-    fig.savefig(figs / "ghz_state_circuit.png")
-    plt.close(fig)
     # GHZ state
+    print("\n--- Processing GHZ State ---")
     qc_ghz = create_ghz_state(n_qubits)
-    counts_ghz = sampler.run([qc_ghz], shots=shots).result()[0].data.meas.get_counts()
-    print("GHZ State:", counts_ghz)
+    
+    fig_ghz = qc_ghz.draw(output='mpl')
+    plt.show()
+
+    # verify state amplitude    
+    qc_ghz_meas = qc_ghz.copy()
+    qc_ghz_meas.measure_all()
+    
+    result_ghz = sampler.run([qc_ghz_meas], shots=shots).result()[0]
+    counts_ghz = result_ghz.data.meas.get_counts()  
+    print("GHZ State Counts:", counts_ghz)
+    
     plot_histogram(counts_ghz)
-    plt.savefig(figs / "ghz_state_histogram.png")
-    plt.close()
+    plt.show()
 
-    # W circuit
-    fig = create_w_circuit(n_qubits).draw(output='mpl')
-    fig.savefig(figs / "w_state_circuit.png")
-    plt.close(fig)
     # W state
+    print("\n--- Processing W State ---")
     qc_w = create_w_state(n_qubits)
-    counts_w = sampler.run([qc_w], shots=shots).result()[0].data.meas.get_counts()
-    print("W State:", counts_w)
+    
+    fig_w = qc_w.draw(output='mpl')
+    plt.show()
+    
+    # verify state amplitude    
+    qc_w_meas = qc_w.copy()
+    qc_w_meas.measure_all()
+    
+    result_w = sampler.run([qc_w_meas], shots=shots).result()[0]
+    counts_w = result_w.data.meas.get_counts()      
+    print("W State Counts:", counts_w)
+    
     plot_histogram(counts_w)
-    plt.savefig(figs / "w_state_histogram.png")
-    plt.close()
+    plt.show()
 
-
-if __name__ == "__main__":
-    main()
+    # error channel
+    from qiskit.visualization import plot_state_city
+    
+    print("\n--- Generating Density Matrix City Plots for GHZ State ---")
+    
+    # pure GHZ state den matrix
+    rho_pure = DensityMatrix.from_instruction(qc_ghz)
+    
+    # noisy matrices
+    gamma_val = 0.3
+    rho_phase_noisy = apply_phase_damping(rho_pure, gamma=gamma_val)
+    rho_amp_noisy   = apply_amplitude_damping(rho_pure, gamma=gamma_val)
+    rho_dep_noisy   = apply_depolarizing_noise(rho_pure, param=gamma_val)
+    
+    small_size = (7, 5)
+    # pure state
+    fig1 = plot_state_city(rho_pure, title="GHZ - Ideal Pure State (Real Part)", figsize=small_size)    
+    # phase damping 
+    fig2 = plot_state_city(rho_phase_noisy, title=f"GHZ - Phase Damping (gamma={gamma_val})", figsize=small_size)    
+    # amplitude damping
+    fig3 = plot_state_city(rho_amp_noisy, title=f"GHZ - Amplitude Damping (gamma={gamma_val})", figsize=small_size)    
+    # depolarizing noise
+    fig4 = plot_state_city(rho_dep_noisy, title=f"GHZ - Depolarizing Noise (param={gamma_val})", figsize=small_size)
+    plt.show()

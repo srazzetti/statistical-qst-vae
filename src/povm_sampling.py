@@ -137,23 +137,12 @@ def samples_to_empirical_dist(samples, N):
     return P_empirical
 
 
-def create_ghz_state(n_qubits):
-    """
-    Build a GHZ-state preparation circuit on n_qubits (no measurement),
-    so it can be passed to DensityMatrix(qc) for the exact state.
-    """
-    from qiskit import QuantumCircuit
-    qc = QuantumCircuit(n_qubits)
-    qc.h(0)
-    for i in range(1, n_qubits):
-        qc.cx(0, i)
-    return qc
-
 # ----------------------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
 
     # debug - test : useless functions, only for testing
     from qiskit import QuantumCircuit
+    from statesprep import create_ghz_state
     from qiskit.quantum_info import DensityMatrix
     from qiskit.visualization import plot_state_city, plot_state_hinton, plot_state_qsphere
 
