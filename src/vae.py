@@ -197,22 +197,42 @@ class FidelityMonitor(keras.callbacks.Callback):
     def __init__(self, P_exact, n_qubits, n_gen=20000, seed=0):
         super().__init__()
         self.P_exact = P_exact
-        self.P_exact_one_hot = {samples_to_onehot(outcome, n_qubits): p for outcome, p in P_exact.items()}
         self.n_qubits = n_qubits
         self.n_gen = n_gen
         self.seed = seed
 
     def on_epoch_end(self, epoch, logs=None):
-        # Generate samples from the model and compute the empirical distribution over the POVM outcomes
-        generated_samples = self.model.sample(self.n_gen, seed=self.seed)
-        self.P_vae = samples_to_empirical_dist(generated_samples, self.n_qubits)
+        # RNG con seed fisso -> campionamento riproducibile a ogni epoca
+        rng = np.random.default_rng(self.seed)
 
-        # Compute the fidelity between the exact and the VAE distributions
-        Fc = float(sum(np.sqrt(self.P_exact_one_hot.get(x, 0.0) * self.P_vae.get(x, 0.0))
-                       for x in set(self.P_exact_one_hot) | set(self.P_vae)))
+        # Genera n_gen campioni dal VAE -> (n_gen, n_qubits, 4): per ogni qubit, prob sui 4 outcome SIC-POVM
+        probs = self.model.sample(self.n_gen).numpy().reshape(self.n_gen, self.n_qubits, 4)
+
+        # CDF lungo l'asse dei 4 outcome: [p0,p1,p2,p3] -> [p0, p0+p1, p0+p1+p2, 1.0]
+        cum = np.cumsum(probs, axis=-1)
+
+        # Uniformi in [0,1), una per (campione, qubit); ultima dim = 1 per broadcast contro cum
+        u = rng.random((self.n_gen, self.n_qubits, 1))
+
+        # Inverse-CDF sampling: primo True lungo l'asse outcome -> indice outcome estratto (0-3)
+        draws = (u < cum).argmax(axis=-1)
+
+        # Ogni campione (vettore di outcome per qubit) -> tupla di int
+        gen = [tuple(int(a) for a in r) for r in draws]
+
+        # Conta frequenze -> distribuzione empirica generata dal VAE {outcome: prob}
+        P_vae = samples_to_empirical_dist(gen, self.n_qubits)
+
+        # Classical fidelity (coeff. di Bhattacharyya): F_c = sum_x sqrt(P_exact(x) * P_vae(x))
+        # .get(x, 0.0) -> 0 se l'outcome manca in una delle due distribuzioni
+        Fc = float(sum(np.sqrt(self.P_exact.get(x, 0.0) * P_vae.get(x, 0.0))
+                    for x in set(self.P_exact) | set(P_vae)))
+
+        # Garantisce che logs esista, poi registra val_fidelity (monitorabile da EarlyStopping/checkpoint)
         logs = logs if logs is not None else {}
         logs['val_fidelity'] = Fc
-'''
+        
+    '''
 # === Run A — replica esatta del paper (N=3) ===
 n_qubits = 3
 vae = VAE(n_qubits=n_qubits)              # latente 16, hidden 96 dal PAPER_TABLE
