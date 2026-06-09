@@ -6,6 +6,12 @@ Script: mle.py
 Author: Simone Razzetti
 Date: 8-6-2026
 Description: 
+    Provide all necessary functions to perform quantum state tomography by MLE.
+    Usefull functions:
+        params_to_T()
+        params_to_rho()
+        make_nll()
+        mle_qst()
 """
 
 # ----------------------------------------------------------------------------------------------------------------------------
@@ -16,7 +22,7 @@ from iminuit import Minuit
 from collections import Counter
 from itertools import product as iproduct
 # personal helper
-from src.utils import *
+from utils import *
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Costants

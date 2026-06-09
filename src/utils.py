@@ -6,6 +6,11 @@ Script: utils.py
 Author: Simone Razzetti, Riccardo Ruggeri
 Date: 
 Description: 
+    Provide all recurrent functions, constants and usefull helper.
+    Usefull functions:
+        build_povm()
+        classical_fidelity()
+        quantum_fidelity()
 """
 
 # ----------------------------------------------------------------------------------------------------------------------------
@@ -13,7 +18,9 @@ Description:
 
 import numpy as np
 from itertools import product as iproduct
-from collections import Counter
+from qiskit.quantum_info import state_fidelity, DensityMatrix
+
+# from collections import Counter
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Costants
@@ -52,6 +59,37 @@ def build_povm(N):
             op = np.kron(op, M1[outcome[i]])
         povm_dict[outcome] = op
     return povm_dict
+
+
+# Fidelity
+def classical_fidelity(P1, P2):
+    """
+    Classical fidelity (Bhattacharyya) among two distributions:  Fc = sum_x sqrt(P1(x) * P2(x))
+
+    Args:
+        P1: dict{outcome: prob}
+        P2: dict{outcome: prob}
+
+    Returns: Fc
+    """
+    # compute the union of all observed outcomes from both probability distributions
+    # "|" pipe ensures to keep all possible results
+    outcomes = set(P1.keys()) | set(P2.keys())
+    return sum(np.sqrt(P1.get(o, 0.0) * P2.get(o, 0.0)) for o in outcomes)
+
+def quantum_fidelity(rho1, rho2):
+    """
+    Quantum fidelity (Jozsa): Fq(rho1, rho2) = [ Tr( sqrt( sqrt(rho1) @ rho2 @ sqrt(rho1) ) ) ]^2
+    If one of states is pure: Fq = <psi1|rho2|psi1>, where |psi1> --> rho1 
+    
+    Args:
+        rho1: denisty matrix 
+        rho2: density matrix
+    Returns: Fq
+    """
+    # state fidelity first verifies if one in rho1, rho2 is pure, then perform the relative calculation
+    Fq = state_fidelity(DensityMatrix(rho1), DensityMatrix(rho2))
+    return Fq
 
 # ----------------------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__": 

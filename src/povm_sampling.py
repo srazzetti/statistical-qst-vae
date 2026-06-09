@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 from itertools import product as iproduct
 from collections import Counter
 # personal helper
-from src.utils import *
+from utils import *
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Costants
