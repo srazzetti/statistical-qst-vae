@@ -16,10 +16,14 @@ Description: Implementazione di un VAE per tomografia di stato quantistico da st
                 - on_epoch_begin: aggiorna il peso KL in modo lineare da 0 a beta_max sui primi warmup_epochs
 """
 
+import numpy as np
 import tensorflow as tf
 import keras
 from keras.layers import Dense
 from keras import ops
+import sys
+sys.path.append('../src')  # per importare da src/ senza problemi
+from povm_sampling import samples_to_onehot, samples_to_empirical_dist
 
 # --- Table 1 del paper: geometria per numero di qubit ---
 # (hidden per layer, latent_dim, batch_size, N_e)
@@ -151,14 +155,16 @@ class VAE(keras.Model):
         total_loss, rec_loss, kl_loss = self._compute_losses(x)
         return {"loss": total_loss, "reconstruction_loss": rec_loss, "kl_loss": kl_loss}
 
-    def sample(self, n_samples):
+    def sample(self, n_samples, seed=42):
         '''
         Campiona n_samples dal latente standard e decodifica.
         Args:
             n_samples: numero di campioni da generare
+            seed: seme casuale per riproducibilità
         Returns:
             samples: array di forma (n_samples, 4N) con valori in [0,1] (output del decoder)
         '''
+        tf.random.set_seed(seed)
         z = tf.random.normal(shape=(n_samples, self.latent_dim))
         samples = self.decode(z)
         return samples
@@ -179,7 +185,33 @@ class KLWarmup(keras.callbacks.Callback):
         w = min(self.beta_max, self.beta_max * epoch / self.warmup_epochs)
         self.model.kl_weight.assign(w)
 
+class FidelityMonitor(keras.callbacks.Callback):
+    """
+    Define Fidelty monitor.
+        Args:
+            P_exact: the exact probability distribution over the POVM outcomes.
+            n_qubits: the number of qubits in the system.
+            n_gen: the number of samples to generate from the model for estimating the fidelity.
+            seed: the random seed for reproducibility.
+    """
+    def __init__(self, P_exact, n_qubits, n_gen=20000, seed=0):
+        super().__init__()
+        self.P_exact = P_exact
+        self.P_exact_one_hot = {samples_to_onehot(outcome, n_qubits): p for outcome, p in P_exact.items()}
+        self.n_qubits = n_qubits
+        self.n_gen = n_gen
+        self.seed = seed
 
+    def on_epoch_end(self, epoch, logs=None):
+        # Generate samples from the model and compute the empirical distribution over the POVM outcomes
+        generated_samples = self.model.sample(self.n_gen, seed=self.seed)
+        self.P_vae = samples_to_empirical_dist(generated_samples, self.n_qubits)
+
+        # Compute the fidelity between the exact and the VAE distributions
+        Fc = float(sum(np.sqrt(self.P_exact_one_hot.get(x, 0.0) * self.P_vae.get(x, 0.0))
+                       for x in set(self.P_exact_one_hot) | set(self.P_vae)))
+        logs = logs if logs is not None else {}
+        logs['val_fidelity'] = Fc
 '''
 # === Run A — replica esatta del paper (N=3) ===
 n_qubits = 3

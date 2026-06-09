@@ -9,12 +9,12 @@ figs = Path("states/figs")
 figs.mkdir(parents=True, exist_ok=True)
 
 
+# Functions to create GHZ and W states, both as state preparation circuits and as full circuits with measurement.
 def create_ghz_state(n_qubits):
     qc = QuantumCircuit(n_qubits)
     qc.h(0)
     for i in range(1, n_qubits):
         qc.cx(0, i)
-    qc.measure_all()
     return qc
 
 def create_ghz_circuit(n_qubits):
@@ -31,9 +31,7 @@ def create_w_state(n_qubits):
     for k in range(n_qubits):
         w_vector[2**k] = 1 / np.sqrt(n_qubits)
     qc.initialize(w_vector, range(n_qubits))
-    qc.measure_all()
     return qc
-
 
 def create_w_circuit(n_qubits):
     qc = QuantumCircuit(n_qubits)
