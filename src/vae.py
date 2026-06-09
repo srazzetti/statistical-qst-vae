@@ -201,32 +201,32 @@ class FidelityMonitor(keras.callbacks.Callback):
         self.n_gen = n_gen
         self.seed = seed
 
-    def on_epoch_end(self, epoch, logs=None):
-        # RNG con seed fisso -> campionamento riproducibile a ogni epoca
+    def vae_generate(self, model, n_samples):
         rng = np.random.default_rng(self.seed)
-
-        # Genera n_gen campioni dal VAE -> (n_gen, n_qubits, 4): per ogni qubit, prob sui 4 outcome SIC-POVM
-        probs = self.model.sample(self.n_gen).numpy().reshape(self.n_gen, self.n_qubits, 4)
-
-        # CDF lungo l'asse dei 4 outcome: [p0,p1,p2,p3] -> [p0, p0+p1, p0+p1+p2, 1.0]
+        probs = model.sample(n_samples).numpy().reshape(n_samples, self.n_qubits, 4)  # (n, N, 4)
+        # campiona UNA classe per gruppo secondo le probabilita' del decoder
+        # (argmax darebbe solo la moda: perderebbe la distribuzione)
         cum = np.cumsum(probs, axis=-1)
-
-        # Uniformi in [0,1), una per (campione, qubit); ultima dim = 1 per broadcast contro cum
-        u = rng.random((self.n_gen, self.n_qubits, 1))
-
-        # Inverse-CDF sampling: primo True lungo l'asse outcome -> indice outcome estratto (0-3)
-        draws = (u < cum).argmax(axis=-1)
-
-        # Ogni campione (vettore di outcome per qubit) -> tupla di int
-        gen = [tuple(int(a) for a in r) for r in draws]
+        u = rng.random((n_samples, self.n_qubits, 1))
+        draws = (u < cum).argmax(axis=-1)            # (n, N): outcome per qubit
+        return [tuple(int(a) for a in row) for row in draws]
+    
+    def classical_fidelity(self, P, Q):
+        return float(sum(np.sqrt(P.get(x, 0.0) * Q.get(x, 0.0)) for x in set(P) | set(Q)))
+    
+    def total_variation(self, P, Q):
+        # TV = 1/2 sum|P-Q|: 0=identiche, molto piu' severa di F_c
+        return float(0.5 * sum(abs(P.get(x, 0.0) - Q.get(x, 0.0)) for x in set(P) | set(Q)))
+    
+    def on_epoch_end(self, epoch, logs=None):
+        # Genera campioni dal VAE e stima la distribuzione empirica P_vae sui 4^N outcomes
+        gen = self.vae_generate(self.model, self.n_gen)
 
         # Conta frequenze -> distribuzione empirica generata dal VAE {outcome: prob}
         P_vae = samples_to_empirical_dist(gen, self.n_qubits)
 
-        # Classical fidelity (coeff. di Bhattacharyya): F_c = sum_x sqrt(P_exact(x) * P_vae(x))
-        # .get(x, 0.0) -> 0 se l'outcome manca in una delle due distribuzioni
-        Fc = float(sum(np.sqrt(self.P_exact.get(x, 0.0) * P_vae.get(x, 0.0))
-                    for x in set(self.P_exact) | set(P_vae)))
+        # Classical fidelity (coeff. di Bhattacharyya):
+        Fc = self.classical_fidelity(self.P_exact, P_vae)
 
         # Garantisce che logs esista, poi registra val_fidelity (monitorabile da EarlyStopping/checkpoint)
         logs = logs if logs is not None else {}
