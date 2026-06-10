@@ -43,21 +43,59 @@ class Plots:
         plt.tight_layout()
         plt.show()
 
-    def plot_distribution_compare(self, p_true, p_gen, p_train, idx):
-        # Plot the distribution of probabilities for the true distribution, generated distribution, and training distribution
-        plt.figure(figsize=(12, 5))
-        ax = plt.gca()
-        ax.bar(idx, p_true, width=1.0, alpha=0.55, color='C0', edgecolor='none', label='P esatta (GHZ)')
-        ax.plot(idx, p_gen,   color='C1', lw=1.5, marker='.', ms=4, label='P generata (VAE)')
-        ax.plot(idx, p_train, color='C2', lw=1.5, marker='.', ms=4, label='P training (shot noise)')
-        ax.axhline(1/len(idx), ls='--', c='gray', lw=1.5, label='uniforme (floor)')
+    def plot_distribution_compare(self, p_true, p_gen, p_train, outcomes=None):
+        """
+        Confronto esatta (GHZ) vs VAE vs training, pensato per 3 qubit (64 outcomes POVM).
 
-        ax.set_xlim(-0.5, len(idx) - 0.5)
-        ax.set_xlabel(f'indice outcome', fontsize=11)
+        Layout "barre annidate": per ogni outcome una barra-contenitore larga (P esatta,
+        contorno colorato + riempimento tenue) e, al suo interno, due barre sottili
+        affiancate (training e VAE). Cosi' si occupa lo spazio di soli 64 outcome ma si
+        mostrano tutte e tre le distribuzioni; quando una barra interna sfora il contenitore
+        si legge subito la sovrastima rispetto alla distribuzione esatta.
+
+        outcomes : lista degli outcome (tuple es. (0,1,3)) usata per le etichette x.
+                   Se None, si usano gli indici 0..N-1.
+        """
+        p_true  = np.asarray(p_true,  dtype=float)
+        p_gen   = np.asarray(p_gen,   dtype=float)
+        p_train = np.asarray(p_train, dtype=float)
+        n = len(p_true)
+        x = np.arange(n)
+
+        w_out = 0.95   # larghezza barra-contenitore (P esatta)
+        w_in  = 0.25   # larghezza barre interne (train / VAE), due affiancate dentro w_out
+
+        _, ax = plt.subplots(figsize=(10, 5))
+
+        # contenitore: P esatta come barra larga, contorno netto + riempimento molto tenue
+        ax.bar(x, p_true, width=w_out,
+               facecolor='white', edgecolor='black', linewidth=0.8,
+               label='P esatta (GHZ)', zorder=1)
+
+        # due barre sottili affiancate dentro ogni contenitore
+        ax.bar(x - w_in / 2, p_train, width=w_in, color='C0', zorder=2,
+               label='P training (shot noise)')
+        ax.bar(x + w_in / 2, p_gen,   width=w_in, color='C1', zorder=2,
+               label='P VAE')
+
+        ax.axhline(1 / n, ls='--', c='gray', lw=1.0, zorder=0, label='uniforme (floor)')
+
+        # etichette = tuple degli outcome (es. "013"), ruotate per leggibilita'
+        if outcomes is not None:
+            ticks = [''.join(map(str, o)) if hasattr(o, '__iter__') else str(o) for o in outcomes]
+            ax.set_xticks(x)
+            ax.set_xticklabels(ticks, rotation=90, fontsize=6.5, family='monospace')
+            ax.set_xlabel('outcome POVM  (a$_1$a$_2$a$_3$)', fontsize=11)
+        else:
+            ax.set_xlabel('indice outcome', fontsize=11)
+
+        ax.set_xlim(-0.7, n - 0.3)
         ax.set_ylabel('probabilità', fontsize=11)
-        ax.set_title(f'POVM: esatta vs VAE vs training', fontsize=11, pad=10)
-        ax.tick_params(labelsize=10)
-        ax.legend(fontsize=10, framealpha=0.8, loc='upper right')
+        ax.set_title('POVM 3 qubit: esatta (contenitore) vs training / VAE (barre interne)',
+                     fontsize=12, pad=10)
+        ax.tick_params(axis='y', labelsize=10)
+        ax.grid(axis='y', ls=':', alpha=0.4)
+        ax.legend(fontsize=10, framealpha=0.85, loc='upper right')
 
         plt.tight_layout()
         plt.show()
