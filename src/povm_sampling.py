@@ -68,6 +68,63 @@ def povm_probability(rho, N, povm_dict=None):
 
     return P
 
+def povm_probability_efficient(rho, N, povm_dict=None):
+    """
+    Compute the exact probability of each outcome a = (a1, ..., aN) of 4^N possible:
+        P(a) = Tr[M(a1) x ... x M(aN) @ rho]
+
+    Stessa identica matematica del loop su build_povm(N), ma calcolata per
+    contrazione tensoriale: i 4^N operatori densi (2^N x 2^N) non vengono MAI
+    costruiti. La memoria di picco resta O(4^N) (come rho stessa) invece di
+    O(4^N * 4^N), rendendo trattabili N = 6, 7, 8. Risultati identici a meno
+    del floating point.
+
+    Args:
+        rho : density matrix to "measure" (2^N x 2^N) - rho.data if rho is DensityMatrix
+        N   : number of qubits
+        povm_dict : ignorato, tenuto solo per compatibilita' con vecchie chiamate
+
+    Returns:
+        dict {(a1,...,aN): probability}
+    """
+    # input sanity check
+    rho = np.asarray(rho)
+    expected_dim = 2**N
+    assert rho.shape == (expected_dim, expected_dim), \
+        f"rho dimensions {rho.shape} does not fit N = {N} qubits."
+
+    # operatori SIC-POVM a singolo qubit impilati: M[a] = M1[a], shape (4, 2, 2)
+    M = np.stack(M1)
+
+    # Tr[M(a) @ rho] = sum_{i,j} prod_k M1[a_k][i_k, j_k] * rho[j, i].
+    # Uso rho.T cosi' che R[i_0..i_{N-1}, j_0..j_{N-1}] = rho[j, i].
+    # (rho non e' simmetrica per via di sigma_y: la trasposta serve ad essere esatti.)
+    R = np.ascontiguousarray(rho.T).reshape([2] * N + [2] * N)
+
+    # Contrazione un qubit alla volta. Prima del passo k gli assi di R sono:
+    #   [i_k, ..., i_{N-1}, j_k, ..., j_{N-1}, a_0, ..., a_{k-1}]
+    # Contraggo i_k (asse 0) e j_k (asse N-k) con gli assi (i, j) di M (1, 2),
+    # generando l'asse esito a_k, che sposto in coda.
+    for k in range(N):
+        j_pos = N - k                          # posizione corrente di j_k
+        R = np.tensordot(M, R, axes=([1, 2], [0, j_pos]))
+        R = np.moveaxis(R, 0, -1)              # manda il nuovo asse esito a_k in fondo
+
+    # ora R ha shape (4,)*N con assi (a_0, ..., a_{N-1}); P deve essere reale
+    P_tensor = np.real(R)
+
+    # appiattisco nello STESSO ordine di build_povm / iproduct(range(4), repeat=N)
+    outcomes = iproduct(range(4), repeat=N)
+    P = {a: float(p) for a, p in zip(outcomes, P_tensor.ravel())}
+
+    # stesso post-processing di prima:
+    # clip dei minimi negativi a 0 (floating-point) e rinormalizzazione
+    P = {k: max(v, 0.0) for k, v in P.items()}
+    total = sum(P.values())
+    P = {k: v / total for k, v in P.items()}
+
+    return P
+
 def sample_povm(P_exact, n_samples=1, seed=42):
     """
     Simulates n_samples measurements POVM sampling from the exact distribution.
