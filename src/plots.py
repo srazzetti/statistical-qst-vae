@@ -45,7 +45,7 @@ def plot_total_loss(history):
     plt.show()
 
 def plot_distribution_delta(p_true, p_gen, p_train, outcomes=None,
-                            sort_by='true', annotate_metrics=True):
+                            sort_by='true', annotate_metrics=True, abs=True):
     """
     Compare the true distribution (p_true), the VAE-generated distribution (p_gen), and the training distribution (p_train) 
     by plotting their differences (delta) from the true distribution.
@@ -62,25 +62,23 @@ def plot_distribution_delta(p_true, p_gen, p_train, outcomes=None,
     p_train = np.asarray(p_train, dtype=float)
     n = len(p_true)
 
-    # ordinamento per leggibilita': outcome dominanti (P_true alta) a sinistra
     order = np.argsort(p_true)[::-1] if sort_by == 'true' else np.arange(n)
     p_true, p_gen, p_train = p_true[order], p_gen[order], p_train[order]
 
-    # scostamenti dalla distribuzione esatta (= 0)
     d_train = p_train - p_true
     d_gen   = p_gen   - p_true
+    if abs:
+        d_train = np.abs(d_train)
+        d_gen   = np.abs(d_gen)
+
     x = np.arange(n)
 
     _, ax = plt.subplots(figsize=(11, 5))
 
-    # linea di riferimento: distribuzione esatta -> Delta = 0
     ax.axhline(0.0, color='black', lw=1.2, zorder=3, label='P esatta (riferimento, Δ=0)')
-
-    # stem (segmentini verticali) per guidare l'occhio dallo zero al punto
     ax.vlines(x, 0, d_train, color='C0', alpha=0.25, lw=0.8, zorder=1)
     ax.vlines(x, 0, d_gen,   color='C1', alpha=0.25, lw=0.8, zorder=1)
 
-    # TVD (total variation distance) come metrica sintetica di distanza
     if annotate_metrics:
         tvd_train = 0.5 * np.sum(np.abs(d_train))
         tvd_gen   = 0.5 * np.sum(np.abs(d_gen))
@@ -94,7 +92,6 @@ def plot_distribution_delta(p_true, p_gen, p_train, outcomes=None,
     ax.scatter(x, d_gen, s=28, color='C1', edgecolor='white', linewidth=0.4,
                marker='D', zorder=4, label=lab_gen)
 
-    # etichette = tuple degli outcome (es. "013"), ruotate per leggibilita'
     if outcomes is not None:
         outcomes = [outcomes[i] for i in order]
         ticks = [''.join(map(str, o)) if hasattr(o, '__iter__') else str(o) for o in outcomes]
@@ -114,7 +111,7 @@ def plot_distribution_delta(p_true, p_gen, p_train, outcomes=None,
     plt.tight_layout()
     plt.show()
 
-def plot_fidelity_vs_samples(self, results):
+def plot_fidelity_vs_samples(results):
     """
     Plot the classical fidelity (Fc) as a function of the number of samples used for training, for different numbers of qubits.
     Args:
