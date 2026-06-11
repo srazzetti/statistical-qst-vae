@@ -68,21 +68,19 @@ def povm_probability(rho, N, povm_dict=None):
 
     return P
 
-def povm_probability_efficient(rho, N, povm_dict=None):
+def povm_probability_efficient(rho, N):
     """
     Compute the exact probability of each outcome a = (a1, ..., aN) of 4^N possible:
         P(a) = Tr[M(a1) x ... x M(aN) @ rho]
 
-    Stessa identica matematica del loop su build_povm(N), ma calcolata per
-    contrazione tensoriale: i 4^N operatori densi (2^N x 2^N) non vengono MAI
-    costruiti. La memoria di picco resta O(4^N) (come rho stessa) invece di
-    O(4^N * 4^N), rendendo trattabili N = 6, 7, 8. Risultati identici a meno
-    del floating point.
+    This function implements the exact same mathematics as looping over build_povm(N), but utilizes 
+    tensor contraction so that the 4^N dense operators (2^N x 2^N) are never explicitly constructed. 
+    This reduces the peak memory usage, rendering simulations up to N = 8 qubits tractable. 
+    Results are identical to the naive implementation up to floating-point precision.
 
     Args:
         rho : density matrix to "measure" (2^N x 2^N) - rho.data if rho is DensityMatrix
         N   : number of qubits
-        povm_dict : ignorato, tenuto solo per compatibilita' con vecchie chiamate
 
     Returns:
         dict {(a1,...,aN): probability}
@@ -93,32 +91,37 @@ def povm_probability_efficient(rho, N, povm_dict=None):
     assert rho.shape == (expected_dim, expected_dim), \
         f"rho dimensions {rho.shape} does not fit N = {N} qubits."
 
-    # operatori SIC-POVM a singolo qubit impilati: M[a] = M1[a], shape (4, 2, 2)
+    # merges M1 op into a single block (3-axis tensor) with shape (4, 2, 2)
+    # Axis 0: The 4 measurement outcomes (a_k). Axes 1, 2: Physical row (i) and column (j) indices
     M = np.stack(M1)
 
-    # Tr[M(a) @ rho] = sum_{i,j} prod_k M1[a_k][i_k, j_k] * rho[j, i].
-    # Uso rho.T cosi' che R[i_0..i_{N-1}, j_0..j_{N-1}] = rho[j, i].
-    # (rho non e' simmetrica per via di sigma_y: la trasposta serve ad essere esatti.)
-    R = np.ascontiguousarray(rho.T).reshape([2] * N + [2] * N)
+    # rewrite rho to explicitly expose the individual qubit spaces
+    # rho.T implements the index swap required by the trace: Tr(M @ rho) = sum(M_ij * rho_ji).
+    # reshape([2]*N + [2]*N) unravels the 2 global axes into 2N microscopic physical indices:
+    # rho --> R[i_0, ..., i_{N-1}, j_0, ..., j_{N-1}] where is, js are single qubit rows, cols
+    R = np.ascontiguousarray(rho.T).reshape([2] * N + [2] * N)      
 
-    # Contrazione un qubit alla volta. Prima del passo k gli assi di R sono:
+
+    # Contraction one qubit at a time. Before step k, the axes of R are:
     #   [i_k, ..., i_{N-1}, j_k, ..., j_{N-1}, a_0, ..., a_{k-1}]
-    # Contraggo i_k (asse 0) e j_k (asse N-k) con gli assi (i, j) di M (1, 2),
-    # generando l'asse esito a_k, che sposto in coda.
+    # Contract i_k (axis 0) and j_k (axis N-k) with the (i, j) axes of M (1, 2),
+    # generating the outcome axis a_k (dim 4), which is then moved to the end.
     for k in range(N):
-        j_pos = N - k                          # posizione corrente di j_k
+        j_pos = N - k      
+        # R_next[a_k, i_rest, j_rest, a_past] = sum_{i_k, j_k} M[a_k, i_k, j_k] * R[i_k, i_rest, j_k, j_rest, a_past]        
         R = np.tensordot(M, R, axes=([1, 2], [0, j_pos]))
-        R = np.moveaxis(R, 0, -1)              # manda il nuovo asse esito a_k in fondo
+        # move new axis a_k to the end: [i_k, ..., j_k, ...] -> [..., a_0, ..., a_k]
+        R = np.moveaxis(R, 0, -1)              
 
-    # ora R ha shape (4,)*N con assi (a_0, ..., a_{N-1}); P deve essere reale
+    # R has shape (4,4,..., 4)=(4,)*N  with axes (a_0, ..., a_{N-1}) each of dim 4
+    # P must be real
     P_tensor = np.real(R)
 
-    # appiattisco nello STESSO ordine di build_povm / iproduct(range(4), repeat=N)
+    # flatten the tensor, same order as iproduct gives
     outcomes = iproduct(range(4), repeat=N)
     P = {a: float(p) for a, p in zip(outcomes, P_tensor.ravel())}
 
-    # stesso post-processing di prima:
-    # clip dei minimi negativi a 0 (floating-point) e rinormalizzazione
+    # sanity check
     P = {k: max(v, 0.0) for k, v in P.items()}
     total = sum(P.values())
     P = {k: v / total for k, v in P.items()}
@@ -162,28 +165,48 @@ def samples_to_onehot(samples, N):
             X[row, qubit * 4 + a] = 1.0
     return X
 
-def onehot_to_samples(X, N):
+def onehot_to_samples(X, N, deterministic=False, seed=42):
     """
-    Inverse transformation of samples_to_onehot()
-    Args :
-        X: matrix (n_samples, 4N) of one-hot label (or softmax)
-        N: number of qubits
-    
-    Returns: list of tuple (a1, a2, ..., aN) with ai in {0,1,2,3}
+    Inverse transformation of samples_to_onehot(), supporting both deterministic (argmax) and 
+    stochastic (probabilistic) sampling.
+    Args:
+        X : matrix (n_samples, 4N) of one-hot label (or softmax)
+        N : number of qubits
+        deterministic (bool): If True, uses argmax to pick the most probable outcome
+                              If False (default), samples stochastically each softmax
+        seed : (default=42)
+
+    Returns:
+        list: list of tuple (a1, a2, ..., aN) with ai in {0,1,2,3}
     """
-    samples = []
-    for row in X:
-        outcome = tuple(
-            np.argmax(row[qubit*4 : qubit*4 + 4])
-            for qubit in range(N)
-        )
-        samples.append(outcome)
-    return samples
+    X = np.asarray(X)
+    n_samples = X.shape[0]
+
+    probs = X.reshape(n_samples, N, 4)  # (n_samples, 4N) -> (n_samples, N, 4)
+
+    if deterministic:
+        draws = probs.argmax(axis=-1) # axis=-1 : 4 outcomes
+    else:
+        rng = np.random.default_rng(seed)
+        
+        # extract a single class for each group by probs distributions
+        cum = np.cumsum(probs, axis=-1)     # (n_samples, N, 4)
+        u = rng.random((n_samples, N, 1))   # (n_samples, N, 1)
+        # draws is boolean (n_samples, N, 4) --> argmax(-1) return position of the 1st True 
+        draws = (u < cum).argmax(axis=-1)   # (n_samples, N) povm outcome
+
+    # (n_samples, N) -> list of tuple 
+    return list(map(tuple, draws.tolist()))
 
 def samples_to_empirical_dist(samples, N):
     """
     Estimate the empirical probability distribution P_empirical(a) from the frequencies of collected 
     experimental samples. Outcomes that never occurred are explicitly assigned a probability of 0.0.
+    Args :
+        samples: list of tuple (a1, a2, ..., aN) with ai in {0,1,2,3}
+        N: number of qubits
+    
+    Returns: dict {(a1,...,aN): empirical probability}
     """
     counts = Counter(samples)
     total = len(samples)
@@ -227,6 +250,13 @@ if __name__ == "__main__":
             plt.show()
         
         prob = povm_probability(rho.data, 3)
+
+        # test povm_proba_eff()
+        prob_eff = povm_probability_efficient(rho.data, 3)
+        delta = [prob[esito] - prob_eff[esito] for esito in prob]
+        # print(delta)
+        print('max diff in exact probabilty generation methods: ', np.max(delta))
+
         # print(prob)
         sample = sample_povm(prob, seed=None)
         print(sample)

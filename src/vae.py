@@ -13,10 +13,8 @@ Description:
         VAE (class)
             build, encode, reparametrize, decode, call, train_step, test_step (keras Model)
             sample()
+            predict_dist()
         KLWarmup (callback)
-        FidelityMonitor (callback)
-            vae_generate()
-            total_variation()
 """
 
 # ----------------------------------------------------------------------------------------------------------------------------
@@ -209,7 +207,7 @@ class VAE(keras.Model):
         # samples = self.decode(z)
         return samples
 
-    def generate_empirical_dist(self, n_samples, batch_size=50_000, seed=42):
+    def predict_dist(self, n_samples, batch_size=50_000, seed=42):
         """
         Function to calculate P_vae empirical, sampling the trained decoder.
         Generates n_sample from VAE and compute the distribution working with fixed batch, to
