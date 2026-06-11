@@ -28,8 +28,8 @@ from keras.layers import Dense
 from keras import ops
 import sys
 sys.path.append('../src')  # (da capire se serve)
-from povm_sampling import samples_to_empirical_dist
-from utils import classical_fidelity
+from collections import Counter
+from itertools import product as iproduct
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Costants
@@ -199,12 +199,56 @@ class VAE(keras.Model):
             n_samples: number of sample to create
             seed: (default: 42)
         Returns:
-            samples: array (n_samples, 4N) (decoder output) --> softmax to extract each class
+            samples: array (n_samples, 4N) (decoder output: prob dist of each qubit) 
         '''
-        tf.random.set_seed(seed)
-        z = tf.random.normal(shape=(n_samples, self.latent_dim))
-        samples = self.decode(z)
+        rng = np.random.default_rng(seed)
+        z = rng.standard_normal((n_samples, self.latent_dim)).astype('float32')
+        samples = self.decode(z).numpy()
+        # tf.random.set_seed(seed)
+        # z = tf.random.normal(shape=(n_samples, self.latent_dim))
+        # samples = self.decode(z)
         return samples
+
+    def generate_empirical_dist(self, n_samples, batch_size=50_000, seed=42):
+        """
+        Function to calculate P_vae empirical, sampling the trained decoder.
+        Generates n_sample from VAE and compute the distribution working with fixed batch, to
+        prevent RAM errors.
+        Args:
+            n_samples  : sample to generate (ex. 4**N * 500)
+            batch_size : (default = 50000)
+            seed       : (default = 42)
+        Returns:
+            dict {(a1,...,aN): prob}
+        """
+        rng = np.random.default_rng(seed)
+        counts = Counter()
+        remaining = int(n_samples)
+
+        while remaining > 0:
+            b = min(batch_size, remaining)
+
+            # np rng
+            probs_flat = self.sample(n_samples=b, seed=rng)
+            probs = probs_flat.reshape(b, self.n_qubits, 4)     # (b, 4N) -> (b, N, 4)
+            # z = rng.standard_normal((b, self.latent_dim)).astype('float32')
+            # probs = np.asarray(self.decode(z)).reshape(b, self.n_qubits, 4)     # (b, 4N) -> (b, N, 4)
+    
+            # extract a single class for each group by probs distributions
+            # (argmax does not consider the softmax dist for onehot digits)  
+            cum = np.cumsum(probs, axis=-1)             # (b, N, 4)
+            u = rng.random((b, self.n_qubits, 1))       # (b, N, 1)
+            # draws is boolean (b, N, 4) --> argmax(-1) return position of the 1st True 
+            draws = (u < cum).argmax(axis=-1)           # (b, N) povm outcome
+
+            # map outcomes into tuples and count them
+            counts.update(map(tuple, draws.tolist()))
+            remaining -= b
+
+        total = sum(counts.values())
+
+        return {o: counts.get(o, 0) / total for o in iproduct(range(4), repeat=self.n_qubits)}
+
 
 
 class KLWarmup(keras.callbacks.Callback):
@@ -226,55 +270,6 @@ class KLWarmup(keras.callbacks.Callback):
         '''Update the KL weight. Automatically called at the beginnig of each epoch by Keras'''
         w = min(self.beta_max, self.beta_max * epoch / self.warmup_epochs)
         self.model.kl_weight.assign(w)
-
-class FidelityMonitor(keras.callbacks.Callback):
-    """
-    Keras callback to monitor the classical fidelity at the end of each epoch
-        Input args:
-            P_exact: the exact probability distribution over the POVM outcomes
-            n_qubits: the number of qubits in the system
-            n_gen: the number of samples to generate from the model for estimating the fidelity (n_e)
-            seed: the random seed for reproducibility
-    """
-    def __init__(self, P_exact, n_qubits, n_gen=20000, seed=0):
-        super().__init__()
-        self.P_exact = P_exact
-        self.n_qubits = n_qubits
-        self.n_gen = n_gen
-        self.seed = seed
-
-    def vae_generate(self, model, n_samples):
-        '''Generates samples from vae decoder. It samples the softmax dist of each qubit'''
-        rng = np.random.default_rng(self.seed)
-        # sample the probability of each possible outcome
-        probs = model.sample(n_samples).numpy().reshape(n_samples, self.n_qubits, 4)  # (n, N, 4)
-
-        # extract a single class for each group by probs distributions
-        # (argmax does not consider the softmax dist for onehot digits)
-        cum = np.cumsum(probs, axis=-1)                 # (n, N, 4)
-        u = rng.random((n_samples, self.n_qubits, 1))   # (n, N, 1)
-        # draws is boolean (n, N, 4) --> argmax(-1) return position of the 1st True 
-        draws = (u < cum).argmax(axis=-1)               # (n, N) povm outcome
-        return [tuple(int(a) for a in row) for row in draws]
-    
-    # def classical_fidelity(self, P, Q):
-    #     return float(sum(np.sqrt(P.get(x, 0.0) * Q.get(x, 0.0)) for x in set(P) | set(Q)))
-    
-    def total_variation(self, P, Q):
-        '''TV = 1/2 sum|P-Q|: 0=same'''
-        return float(0.5 * sum(abs(P.get(x, 0.0) - Q.get(x, 0.0)) for x in set(P) | set(Q)))
-    
-    def on_epoch_end(self, epoch, logs=None):
-        '''Compute and log classical fidelity. Automatically called at the end of each epoch by Keras'''
-        # create samples
-        gen = self.vae_generate(self.model, self.n_gen)
-        # compute empirical dist
-        P_vae = samples_to_empirical_dist(gen, self.n_qubits)
-        # compute classical fidelity
-        Fc = classical_fidelity(self.P_exact, P_vae)
-        # ensures logs exist, then log val_fidelity 
-        logs = logs if logs is not None else {}
-        logs['val_fidelity'] = Fc
 
 # ----------------------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__": 
