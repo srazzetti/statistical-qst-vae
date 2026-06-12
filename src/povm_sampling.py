@@ -10,6 +10,7 @@ Description:
     distribution P(a) = Tr[M(a) @ rho].
     Usefull functions:
         povm_probability()
+        povm_probability_efficient()
         sample_povm()
         samples_to_onehot()
         onehot_to samples()

@@ -7,6 +7,12 @@ Author: Riccardo Ruggeri, Simone Razzetti
 Description: 
     Generation and validation possible states. Usefull functions to apply noise channels to 
     pure states (matrices).
+    Functions:
+        create_ghz_state()
+        create_w_state()
+        apply_phase_damping()
+        apply_amplitude_damping()
+        apply_depolarizing_noise()
 """
 
 from pathlib import Path

@@ -10,11 +10,13 @@ Description:
     Class structure is taken by Statistics and Data Analysis lecture on VAE (Prof. De Guio, Unimib).
     Decoder, Encoder architecture are based on Chen et al. (2021), as well as the default parameters.
     Usefull functions and classes:
-        VAE (class)
-            build, encode, reparametrize, decode, call, train_step, test_step (keras Model)
+        VAE (Keras Model)
+            build, encode, reparametrize, decode, call, train_step, test_step (standard Keras Model methods)
+            _compute_losses()
             sample()
             predict_dist()
-        KLWarmup (callback)
+        KLWarmup (Callback)
+            on_epoch_begin (standard Keras Callback method)
 """
 
 # ----------------------------------------------------------------------------------------------------------------------------
@@ -25,7 +27,7 @@ import keras
 from keras.layers import Dense
 from keras import ops
 import sys
-sys.path.append('../src')  # (da capire se serve)
+# sys.path.append('../src')  # (da capire se serve)
 from collections import Counter
 from itertools import product as iproduct
 

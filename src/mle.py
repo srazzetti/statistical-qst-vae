@@ -8,8 +8,10 @@ Date: 8-6-2026
 Description: 
     Provide all necessary functions to perform quantum state tomography by MLE.
     Usefull functions:
+        count_params()
         params_to_T()
         params_to_rho()
+        rho_to_params()
         make_nll()
         mle_qst()
 """
