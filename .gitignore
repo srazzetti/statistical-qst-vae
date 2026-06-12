@@ -223,3 +223,8 @@ __marimo__/
 # Directories with figures, data, and other resources
 # figs/
 results/
+
+
+# to easily use colab vm
+setup_colab.sh
+git_utils.sh
