@@ -28,6 +28,10 @@ import sys
 sys.path.append('../src')  # (da capire se serve)
 from collections import Counter
 from itertools import product as iproduct
+import os
+from datetime import datetime
+import pandas as pd
+from pathlib import Path
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Costants
@@ -42,6 +46,9 @@ PAPER_TABLE = {
     7: dict(hidden=1504, latent=512, batch=800,  n_e=(4**7)*500),
     8: dict(hidden=2560, latent=512, batch=1000, n_e=(4**8)*500),
 }
+
+PROJECT_ROOT = Path("/Users/riccardoruggeri/project-sda/statistical-qst-vae")
+RESULTS_ROOT = PROJECT_ROOT / "results"
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Functions and classes
@@ -266,9 +273,22 @@ class KLWarmup(keras.callbacks.Callback):
 
     def on_epoch_begin(self, epoch, logs=None):
         '''Update the KL weight. Automatically called at the beginnig of each epoch by Keras'''
-        w = min(self.beta_max, self.beta_max * epoch / self.warmup_epochs)
+        w = min(self.beta_max, self.beta_max * (epoch + 1) / self.warmup_epochs)
         self.model.kl_weight.assign(w)
-    
+
+
+def set_up_training(experiment_id = 'run', drive_path = RESULTS_ROOT):
+    timestamp = datetime.now().strftime("%m%d_%H%M")
+    run_dir = os.path.join(drive_path, f"{experiment_id}_{timestamp}")
+    os.makedirs(run_dir, exist_ok=True)
+
+    checkpoint_path = os.path.join(run_dir, "best_weights.weights.h5")
+    history_path    = os.path.join(run_dir, "history.csv")
+
+    print(f"All saved in: {run_dir}")
+
+    return run_dir, checkpoint_path, history_path
+
 # ----------------------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__": 
     print('vae.py has no main')
