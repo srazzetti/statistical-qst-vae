@@ -211,9 +211,6 @@ class VAE(keras.Model):
         rng = np.random.default_rng(seed)
         z = rng.standard_normal((n_samples, self.latent_dim)).astype('float32')
         samples = self.decode(z).numpy()
-        # tf.random.set_seed(seed)
-        # z = tf.random.normal(shape=(n_samples, self.latent_dim))
-        # samples = self.decode(z)
         return samples
 
     def predict_dist(self, n_samples, batch_size=50_000, seed=42):
@@ -238,8 +235,6 @@ class VAE(keras.Model):
             # np rng
             probs_flat = self.sample(n_samples=b, seed=rng)
             probs = probs_flat.reshape(b, self.n_qubits, 4)     # (b, 4N) -> (b, N, 4)
-            # z = rng.standard_normal((b, self.latent_dim)).astype('float32')
-            # probs = np.asarray(self.decode(z)).reshape(b, self.n_qubits, 4)     # (b, 4N) -> (b, N, 4)
     
             # extract a single class for each group by probs distributions
             # (argmax does not consider the softmax dist for onehot digits)  
