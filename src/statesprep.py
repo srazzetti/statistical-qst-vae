@@ -45,6 +45,24 @@ def create_w_state(n_qubits):
     qc.initialize(w_vector, range(n_qubits))
     return qc
 
+def create_plus_state(n_qubits):
+    """
+    Generate an n-qubit product state where each qubit is in the |+> state.
+    
+    Args:
+        n_qubits (int): The number of qubits in the quantum circuit.
+        
+    Returns:
+        QuantumCircuit: A Qiskit QuantumCircuit object representing the state.
+    """
+    qc = QuantumCircuit(n_qubits)
+    
+    # Applies Hadamard to each qubits
+    for i in range(n_qubits):
+        qc.h(i)
+        
+    return qc
+
 # Noise channels --> necessary to study mixed states
 def apply_phase_damping(rho: DensityMatrix, gamma: float) -> DensityMatrix:
     """
