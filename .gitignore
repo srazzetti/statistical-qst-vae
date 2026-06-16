@@ -220,9 +220,14 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Directories with figures, data, and other resources
-# figs/
-results/
+# Model weights (only the weights, not the rest of results/)
+*.h5
+
+# Vector figures
+*.svg
+
+# Archives
+*.zip
 
 
 # to easily use colab vm
