@@ -228,11 +228,10 @@ results/
 # Archives
 *.zip
 
-# SHARED-DRIVE files: 
+# SHARED-DRIVE repo files: 
 # to easily use colab vm
-setup_colab.sh
 git_utils.sh
 setup.sh
-# notebook to run pull before working on colab via drive
-pull-notebook.ipynb
+# notebook for the access to google VM to manage the shared drive repository
+colab-VM-notebook.ipynb
 
