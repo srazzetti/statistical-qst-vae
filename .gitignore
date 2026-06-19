@@ -225,9 +225,6 @@ __marimo__/
 # general directory results - VAE weights
 results/
 
-# Vector figures
-*.svg
-
 # Archives
 *.zip
 
