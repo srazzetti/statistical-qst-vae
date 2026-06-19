@@ -220,8 +220,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Model weights (only the weights, not the rest of results/)
+# Model weights 
 *.h5
+# in general the directory results
+results/
 
 # Vector figures
 *.svg
@@ -229,11 +231,10 @@ __marimo__/
 # Archives
 *.zip
 
-
+# SHARED-DRIVE files: 
 # to easily use colab vm
 setup_colab.sh
 git_utils.sh
 setup.sh
-
 # notebook to run pull before working on colab via drive
 pull-notebook.ipynb
