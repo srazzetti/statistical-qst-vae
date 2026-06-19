@@ -235,3 +235,4 @@ git_utils.sh
 setup.sh
 # notebook to run pull before working on colab via drive
 pull-notebook.ipynb
+demo_to_use_colab_and_drive.ipynb
