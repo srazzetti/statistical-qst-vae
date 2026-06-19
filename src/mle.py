@@ -4,7 +4,6 @@
 """
 Script: mle.py
 Author: Simone Razzetti
-Date: 8-6-2026
 Description: 
     Provide all necessary functions to perform quantum state tomography by MLE.
     Usefull functions:

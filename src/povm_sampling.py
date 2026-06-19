@@ -4,7 +4,6 @@
 """
 Script: povm_sampling.py
 Author: Simone Razzetti
-Date: 6-6-2026
 Description: 
     Functions for the sampling of tetraedric POVM possible outcomes, given a state rho and the exact 
     distribution P(a) = Tr[M(a) @ rho].

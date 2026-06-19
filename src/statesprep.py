@@ -10,6 +10,7 @@ Description:
     Functions:
         create_ghz_state()
         create_w_state()
+        create_plus_state()
         apply_phase_damping()
         apply_amplitude_damping()
         apply_depolarizing_noise()
@@ -26,9 +27,6 @@ from qiskit_aer.noise import phase_damping_error, amplitude_damping_error, depol
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Functions
-
-# figs = Path("figs/states")
-# figs.mkdir(parents=True, exist_ok=True)
 
 def create_ghz_state(n_qubits):
     qc = QuantumCircuit(n_qubits)

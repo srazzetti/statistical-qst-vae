@@ -4,7 +4,6 @@
 """
 Script: utils.py
 Author: Simone Razzetti, Riccardo Ruggeri
-Date: 
 Description: 
     Provide all recurrent functions, constants and usefull helper.
     Usefull functions:
@@ -23,8 +22,6 @@ Description:
 import numpy as np
 from itertools import product as iproduct
 from qiskit.quantum_info import state_fidelity, DensityMatrix
-
-# from collections import Counter
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Costants

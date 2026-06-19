@@ -4,7 +4,6 @@
 """
 Script: vae.py
 Author: Riccardo Ruggeri
-Date: 8/6/2026
 Description: 
     Provides classes for the implementation of a VAE, base on Keras methods.
     Class structure is taken by Statistics and Data Analysis lecture on VAE (Prof. De Guio, Unimib).
@@ -17,6 +16,7 @@ Description:
             predict_dist()
         KLWarmup (Callback)
             on_epoch_begin (standard Keras Callback method)
+        set_up_training()
 """
 
 # ----------------------------------------------------------------------------------------------------------------------------
@@ -290,18 +290,3 @@ def set_up_training(experiment_id = 'run', drive_path = RESULTS_ROOT):
 if __name__ == "__main__": 
     print('vae.py has no main')
 
-
-'''
-# === Run A — replica esatta del paper (N=3) ===
-n_qubits = 3
-vae = VAE(n_qubits=n_qubits)              # latente 16, hidden 96 dal PAPER_TABLE
-vae.compile(optimizer=keras.optimizers.Adam(learning_rate=1e-3))
-vae.build(input_shape=(None, 4 * n_qubits))
-vae.summary()
-
-# === Run di griglia — esempio VAE ortodosso ===
-# vae = VAE(n_qubits=3, latent_dim=4)      # latente piccolo
-# poi: callbacks=[KLWarmup(beta_max=1.0)]  # KL forte
-
-model = vae
-'''

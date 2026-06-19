@@ -1,6 +1,21 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Script: plots.py
+Author: Riccardo Ruggeri
+Description: 
+    It provides shortcuts to recurrent usefull plots.
+"""
+
+# ----------------------------------------------------------------------------------------------------------------------------
+# Imports
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+
+# ----------------------------------------------------------------------------------------------------------------------------
+# Functions and classes
 
 def plot_reconstruction_and_kl_divergence(history, title=True):
     """
@@ -11,6 +26,7 @@ def plot_reconstruction_and_kl_divergence(history, title=True):
     Args:
         history: Keras History object OR pandas DataFrame/dict containing the loss values
         title: default=True
+    Returns: figure 
     """
     # -- input validation --
     data_source = history.history if hasattr(history, 'history') else history   # dict of History keras class
@@ -19,22 +35,24 @@ def plot_reconstruction_and_kl_divergence(history, title=True):
     reconstruction_losses = {key: data_source[key] for key in keys if 'reconstruction' in key}
     kl_losses = {key: data_source[key] for key in keys if 'kl' in key and 'weight' not in key}
 
-    plt.figure(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(8, 6))
     for key, values in reconstruction_losses.items():
-        plt.plot(values, label=key)
+        ax.plot(values, label=key)
     for key, values in kl_losses.items():
-        plt.plot(values, label=key)
+        ax.plot(values, label=key)
         
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.grid(True, which='both', ls=':', alpha=0.5)
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Loss')
+    ax.legend()
+    ax.grid(True, which='both', ls=':', alpha=0.5)
     
     if title:
-        plt.title('Reconstruction Loss and KL Divergence')
+        ax.set_title('Reconstruction Loss and KL Divergence')
 
-    plt.tight_layout()
+    fig.tight_layout()
     plt.show()
+
+    return fig
 
 
 def plot_total_loss(history, title=True):
@@ -45,6 +63,7 @@ def plot_total_loss(history, title=True):
     Args:
         history: Keras History object OR pandas DataFrame/dict containing the loss values
         title: default=True
+    Returns: figure 
     """
     # -- input validation --
     data_source = history.history if hasattr(history, 'history') else history   # dict of History keras class
@@ -53,20 +72,22 @@ def plot_total_loss(history, title=True):
     # Estrae solo le perdite totali (es. 'loss' e 'val_loss'), escludendo i sotto-componenti
     total_losses = {key: data_source[key] for key in keys if 'loss' in key and 'reconstruction' not in key and 'kl' not in key}
 
-    plt.figure(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(8, 6))
     for key, values in total_losses.items():
-        plt.plot(values, label=key)
+        ax.plot(values, label=key)
         
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.grid(True, which='both', ls=':', alpha=0.5)
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Loss')
+    ax.legend()
+    ax.grid(True, which='both', ls=':', alpha=0.5)
     
     if title:
-        plt.title('Total Loss')
+        ax.set_title('Total Loss')
 
-    plt.tight_layout()
+    fig.tight_layout()
     plt.show()
+
+    return fig
 
 
 def plot_distribution_delta(p_true, p_gen, p_train, sort_by='true', abs=True,
@@ -86,6 +107,7 @@ def plot_distribution_delta(p_true, p_gen, p_train, sort_by='true', abs=True,
         x_ticks_mode (str): 'prob_reference' to show selected p_exact values, 
                             'none' to hide ticks entirely, 'all' for standard index ticks.
         title (bool): If True, prints the title
+    Returns: figure 
     """
     p_true  = np.asarray(p_true,  dtype=float)
     p_gen   = np.asarray(p_gen,   dtype=float)
@@ -111,7 +133,7 @@ def plot_distribution_delta(p_true, p_gen, p_train, sort_by='true', abs=True,
         d_gen   = err_gen_abs
 
     x = np.arange(n)
-    _, ax = plt.subplots(figsize=(11, 5))
+    fig, ax = plt.subplots(figsize=(11, 5))
 
     # p_exact --> 0 line
     ax.axhline(0.0, color='black', lw=1.2, zorder=3, label='$p_{exact} (\\Delta=0)$')
@@ -179,28 +201,40 @@ def plot_distribution_delta(p_true, p_gen, p_train, sort_by='true', abs=True,
     if title:
         ax.set_title('Deviation from $p_{exact}$: Empirical training frequencies vs VAE', fontsize=12, pad=10)
 
-    plt.tight_layout()
+    fig.tight_layout()
     plt.show()
 
+    return fig
 
 def plot_fidelity_vs_samples(results):
     """
     Plot the classical fidelity (Fc) as a function of the number of samples used for training, for different numbers of qubits.
     Args:
         results: dict of the form {n_qubits: {'n_samples': [...], 'Fc': [...]}} containing the number of samples and corresponding fidelities for each qubit count. 
+    Returns: figure 
     """
-    plt.figure(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(8, 5))
     colors = plt.cm.viridis(np.linspace(0, 0.85, len(results)))
 
     for color, (q, r) in zip(colors, sorted(results.items())):
         ns = r["n_samples"]
-        plt.plot(ns, r["Fc"], '-o', color=color, label=f'{q} qubit (VAE)')
+        ax.plot(ns, r["Fc"], '-o', color=color, label=f'{q} qubit (VAE)')
 
-    plt.xscale('log')
-    plt.xlabel('N_SAMPLES (campioni di training)')
-    plt.ylabel('Fidelity classica  $F_c$')
-    plt.title('Fidelity classica vs N_SAMPLES from 3 to 8 qubit')
-    plt.grid(True, which='both', ls=':', alpha=0.5)
-    plt.legend()
-    plt.tight_layout()
+    ax.set_xscale('log')
+    ax.set_xlabel('N_SAMPLES (campioni di training)')
+    ax.ylabel('Fidelity classica  $F_c$')
+    ax.set_title('Fidelity classica vs N_SAMPLES from 3 to 8 qubit')
+    ax.grid(True, which='both', ls=':', alpha=0.5)
+    ax.legend()
+    fig.tight_layout()
     plt.show()
+
+    return fig
+
+# ----------------------------------------------------------------------------------------------------------------------------
+if __name__ == "__main__": 
+    def main () :
+        print("plots.py has no main")
+        return
+
+    main ()
