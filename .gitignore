@@ -222,7 +222,7 @@ __marimo__/
 
 # Model weights 
 *.h5
-# in general the directory results
+# general directory results - VAE weights
 results/
 
 # Vector figures
