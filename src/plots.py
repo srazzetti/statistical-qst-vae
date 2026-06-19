@@ -2,51 +2,76 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 
-def plot_reconstruction_and_kl_divergence(history):
+def plot_reconstruction_and_kl_divergence(history, title=True):
     """
     Plot the reconstruction loss and KL divergence over epochs from the training history.
-    It extracts the relevant losses from the history object and plots them on the same graph for comparison.
+    It extracts the relevant losses from the history object or a loaded DataFrame/dict
+    and plots them on the same graph for comparison.
+    
     Args:
-        history: Keras History object returned by model.fit(), containing the loss values for each epoch
+        history: Keras History object OR pandas DataFrame/dict containing the loss values
+        title: default=True
     """
-    reconstruction_losses = {key: history.history[key] for key in history.history.keys() if 'reconstruction' in key}
-    kl_losses = {key: history.history[key] for key in history.history.keys() if 'kl' in key and 'weight' not in key}
+    # -- input validation --
+    data_source = history.history if hasattr(history, 'history') else history   # dict of History keras class
+    keys = data_source.keys() if hasattr(data_source, 'keys') else data_source.columns
+
+    reconstruction_losses = {key: data_source[key] for key in keys if 'reconstruction' in key}
+    kl_losses = {key: data_source[key] for key in keys if 'kl' in key and 'weight' not in key}
 
     plt.figure(figsize=(8, 6))
     for key, values in reconstruction_losses.items():
         plt.plot(values, label=key)
     for key, values in kl_losses.items():
         plt.plot(values, label=key)
-    plt.title('Reconstruction Loss and KL Divergence')
+        
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
-    plt.grid(True)
+    plt.grid(True, which='both', ls=':', alpha=0.5)
+    
+    if title:
+        plt.title('Reconstruction Loss and KL Divergence')
+
     plt.tight_layout()
     plt.show()
 
-def plot_total_loss(history):
+
+def plot_total_loss(history, title=True):
     """
-    Plot the total loss over epochs from the training history. It extracts the total loss values from the history object and plots them.
+    Plot the total loss over epochs from the training history. 
+    It extracts the total loss values from the history object or a loaded DataFrame/dict and plots them.
+    
     Args:
-        history: Keras History object returned by model.fit(), containing the loss values for each epoch
+        history: Keras History object OR pandas DataFrame/dict containing the loss values
+        title: default=True
     """
-    total_losses = {key: history.history[key] for key in history.history.keys() if 'loss' in key and 'reconstruction' not in key and 'kl' not in key}
+    # -- input validation --
+    data_source = history.history if hasattr(history, 'history') else history   # dict of History keras class
+    keys = data_source.keys() if hasattr(data_source, 'keys') else data_source.columns
+
+    # Estrae solo le perdite totali (es. 'loss' e 'val_loss'), escludendo i sotto-componenti
+    total_losses = {key: data_source[key] for key in keys if 'loss' in key and 'reconstruction' not in key and 'kl' not in key}
 
     plt.figure(figsize=(8, 6))
     for key, values in total_losses.items():
         plt.plot(values, label=key)
-    plt.title('Total Loss')
+        
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
-    plt.grid(True)
+    plt.grid(True, which='both', ls=':', alpha=0.5)
+    
+    if title:
+        plt.title('Total Loss')
+
     plt.tight_layout()
     plt.show()
 
+
 def plot_distribution_delta(p_true, p_gen, p_train, sort_by='true', abs=True,
                              highlight_lines=True, highlight_markers=True,
-                             x_ticks_mode='prob_reference'):
+                             x_ticks_mode='prob_reference', title=True):
     """
     Compare p_true, p_gen, and p_train by plotting their differences from p_true.
     
@@ -60,6 +85,7 @@ def plot_distribution_delta(p_true, p_gen, p_train, sort_by='true', abs=True,
         highlight_markers (bool): If True, increases the marker size for the winning method.
         x_ticks_mode (str): 'prob_reference' to show selected p_exact values, 
                             'none' to hide ticks entirely, 'all' for standard index ticks.
+        title (bool): If True, prints the title
     """
     p_true  = np.asarray(p_true,  dtype=float)
     p_gen   = np.asarray(p_gen,   dtype=float)
@@ -150,7 +176,8 @@ def plot_distribution_delta(p_true, p_gen, p_train, sort_by='true', abs=True,
     ax.legend(by_label.values(), by_label.keys(), fontsize=9, framealpha=0.9, loc='best')
 
     # -- title --
-    ax.set_title('Deviation from $p_{exact}$: Empirical training frequencies vs VAE', fontsize=12, pad=10)
+    if title:
+        ax.set_title('Deviation from $p_{exact}$: Empirical training frequencies vs VAE', fontsize=12, pad=10)
 
     plt.tight_layout()
     plt.show()
