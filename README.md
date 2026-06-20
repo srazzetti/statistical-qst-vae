@@ -1,43 +1,88 @@
-# statistical-qst-vae
-Statistical methods for Quantum State Tomography: evaluating Maximum Likelihood Estimation and Variational Autoencoders
+# Statistical Methods for Quantum State Tomography
+## Evaluating Maximum Likelihood Estimation and Variational Autoencoders
 
-Progetto finale per corso di Statistics and Data Analysis 2025-2026 (Università di Milano Bicocca - Corso di Laurea Magistrale in Fisica)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![TensorFlow](https://img.shields.io/badge/TensorFlow-2.21-orange)
+![Qiskit](https://img.shields.io/badge/Qiskit-2.4-purple)
+![License](https://img.shields.io/badge/License-MIT-green)
+![Repo](https://img.shields.io/badge/repo-statistical--qst--vae-lightgrey)
 
-Stati che sarebbe interessante simulare (esempi su 3 qubit N=3):
-- 
-- stato prodotto $\ket{+}\ket{+}\ket{+}$
-- GHZ $\frac{1}{\sqrt{2}}(\ket{000} + \ket{111})$
-- W  $\frac{1}{\sqrt{3}}(\ket{100}+\ket{010}+\ket{001})$
-- Stato misto (rumore simulato): uno dei precedenti a cui viene associato un modello di rumore --> matrice di densità stato misto
+A systematic comparison of **Maximum Likelihood Estimation (MLE)** and **Variational Autoencoders (VAE)** for Quantum State Tomography (QST), evaluated on GHZ, W, and product states up to 8 qubits via POVM measurement simulations.
 
-Gli esempi sono indicativi, potremmo partire da uno stato come GHZ e decidere poi se estendere
+> Final project for the course *Statistics and Data Analysis* 2025–2026  
+> M.Sc. in Physics — University of Milano-Bicocca
 
-Fasi progetto:
-- 
-- MLE (baseline): ricostruire matrice densità tramite stimatore MLE su POVMs --> limitato a stati "piccoli" [4-5-6 qubit]
-- VAE + algebra: ricostruire distiribuzione di probabilità di misure POVMs e usare algebra (matrice di overlap T) per ricostruire matrice densità + confronto con risultato MLE [4-5-6 qubit]
-- VAE come stimatore della fidelity classica: utilizzare vae per valutare fidelity di stati in dimensione maggiore (notevole dimensione) [$\sim50$ qubit]
+**Authors:**
+- Simone Razzetti — [GitHub](https://github.com/srazzetti)
+- Riccardo Ruggeri — [GitHub](https://github.com/riccardoruggeriphysics)
 
-[...] rappresentano i limiti *teorici* sulla dimensione dello stato per la simulazione. Sono indicativi, e frutto di stime by Gemini. Nota: nel paper simulano 3-8 qubit. Magari possiamo partire con 3 o 4 e vedere se ampliare
+---
 
-Simulazione dati:
-- 
-i dati possono essere generati nei seguenti modi:
-- Nota $\rho_{true}$, è possibile campionare direttamente le distribuzioni di probabilità per ciascun outcome possibile delle misure POVMs sullo  stato 
-- è possibile *simulare* anche l'atto di misura stesso, da effettuare tramite Neimark expansion (sono necessari qubit ancilla, stato dim N --> 3N qubit totali). Ai fini del progetto, non è indispensabile e ha un costo computazionale non indifferente; interessante come spunto per repo o curiosità personale.
+## Overview
 
-(NB: la matrice può essere calcolata sia analiticamente, sia ottenuta tramite *DensityMatrix* in Qiskit su un circuito + quantum_info ed evolve() )
+Quantum State Tomography is a fundamental protocol in the NISQ era, used for gate benchmarking, noise mitigation verification, and fidelity estimation of prepared states. Classical reconstruction methods suffer from the **curse of dimensionality** — the Hilbert space grows exponentially with the number of qubits, making full density matrix reconstruction computationally prohibitive.
 
-TO DO:
--
-- Nome progetto e repo &#10004;
-- Definire stato di simulazione, alcune opzioni: 
-     - GHZ $\longrightarrow$ abbastanza semplice
-     - W $\longrightarrow$ come paper
-     - Dicke (?) $\longrightarrow$ da capire
-     - Werner (?) $\longrightarrow$ da capire
-- Preparare simulazione dati e quindi dataset (programmazione modulare)
-- Analisi classica con MLE
-- Classi e funzioni per VAE (fare affidamento, almeno in principio, a proposte paper su dimensioni + DeGuio per struttura)
-- Confronti statistici + fidelity (nb: con matrici è possibile stimare F_quantum, con distribuzioni VAE solo F_classica)
-- Altro: idee su come rendere più "statistica" il progetto...
+This project implements and compares two approaches:
+
+- **MLE** — Maximum Likelihood Estimation via Cholesky parametrization, optimized with `iminuit` (Migrad algorithm)
+- **VAE** — Variational Autoencoder trained on POVM measurement outcomes to learn the Born probability distribution directly, bypassing explicit density matrix reconstruction
+
+Both methods are evaluated using **Classical Fidelity** (Bhattacharyya coefficient) as the primary metric, enabling a fair direct comparison without requiring full state reconstruction.
+
+---
+
+## Project Structure
+
+```
+statistical-qst-vae/
+├── data/               # CSV files with simulation results
+├── docs/               # Project report (LaTeX/PDF)
+├── figs/               # Generated figures and plots
+├── notebooks/
+│   ├── 01_demo_GHZ3.ipynb      # General demo on proposed methods
+│   ├── 02_MLE_analysis.ipynb   # MLE fidelities and scaling analysis
+│   ├── 03_VAE_analysis.ipynb   # VAE performance and scalabing analysis
+│   └── 04_comparative_analysis.ipynb  # MLE vs VAE comparison
+├── src/                # Source modules (data generation, MLE, VAE, metrics)
+├── requirements.txt
+├── LICENSE
+└── README.md
+```
+
+---
+
+## Installation
+
+Clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/srazzetti/statistical-qst-vae.git
+cd statistical-qst-vae
+pip install -r requirements.txt
+```
+
+Or install core dependencies manually:
+
+```bash
+pip install qiskit==2.4.1 qiskit-aer==0.17.2 tensorflow==2.21.0 keras==3.14.1 \
+            numpy==2.4.6 pandas==3.0.3 matplotlib==3.11.0 scipy==1.17.1 \
+            seaborn==0.13.2 iminuit==2.32.0 scikit-learn==1.9.0
+```
+> Tested on Python 3.10+
+
+---
+
+## References
+
+Key references for this project:
+
+- Chen et al. (2021) — *Reconstructing a quantum state with a variational autoencoder*, Int. J. Quantum Inf. 19(08):2140005
+- Nielsen & Chuang — *Quantum Computation and Quantum Information*, Cambridge University Press
+
+A complete bibliography is available in the project report (`docs/`).
+
+---
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
