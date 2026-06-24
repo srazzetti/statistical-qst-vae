@@ -180,26 +180,26 @@ def plot_distribution_delta(p_true, p_gen, p_train, sort_by='true', abs=True,
         tick_labels = [f"$p_{{ex}}$={p_true[idx]:.4f}" for idx in tick_indices]
         
         ax.set_xticks(tick_indices)
-        ax.set_xticklabels(tick_labels, fontsize=9)
+        ax.set_xticklabels(tick_labels)
     else:
         # Comportamento standard (mostra gli indici numerici 0, 1, 2...)
-        ax.tick_params(axis='x', labelsize=9)
+        ax.tick_params(axis='x')
 
     # --- plot configs ---
-    ax.set_xlabel('outcomes (sorted by decreasing $p_{exact}$ value)', fontsize=11)
+    ax.set_xlabel('outcomes (sorted by decreasing $p_{exact}$ value)')
     ax.set_xlim(-0.7, n - 0.3)
-    ax.set_ylabel('$\\Delta p (p − p_{exact})$' if not abs else '|$\\Delta p$|', fontsize=11)
-    ax.tick_params(axis='y', labelsize=10)
+    ax.set_ylabel('$\\Delta p (p − p_{exact})$' if not abs else '|$\\Delta p$|')
+    ax.tick_params(axis='y')
     ax.grid(axis='y', ls=':', alpha=0.4)
     
     # legend
     handles, labels = ax.get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
-    ax.legend(by_label.values(), by_label.keys(), fontsize=9, framealpha=0.9, loc='best')
+    ax.legend(by_label.values(), by_label.keys(),  framealpha=0.9, loc='lower right')
 
     # -- title --
     if title:
-        ax.set_title('Deviation from $p_{exact}$: Empirical training frequencies vs VAE', fontsize=12, pad=10)
+        ax.set_title('Deviation from $p_{exact}$: Empirical training frequencies vs VAE', pad=10)
 
     fig.tight_layout()
     plt.show()

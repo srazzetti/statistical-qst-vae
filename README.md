@@ -83,6 +83,12 @@ A complete bibliography is available in the project report (`docs/`).
 
 ---
 
+<!-- ## Acknowledgements -> vogliamo inserirlo o superfluo??
+
+AI tools were used to assist with code debugging, LaTeX formatting, and text revision. All scientific content, methodology, and results are the authors' own work.
+
+--- -->
+
 ## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
