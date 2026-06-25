@@ -1,5 +1,4 @@
-# Statistical Methods for Quantum State Tomography
-## Evaluating Maximum Likelihood Estimation and Variational Autoencoders
+# Statistical Methods for Quantum State Tomography: Evaluating Maximum Likelihood Estimation and Variational Autoencoders
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.21-orange)
@@ -7,7 +6,7 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Repo](https://img.shields.io/badge/repo-statistical--qst--vae-lightgrey)
 
-A systematic comparison of **Maximum Likelihood Estimation (MLE)** and **Variational Autoencoders (VAE)** for Quantum State Tomography (QST), evaluated on GHZ, W, and product states up to 8 qubits via POVM measurement simulations.
+A systematic comparison of Maximum Likelihood Estimation (MLE) and Variational Autoencoders (VAE) for Quantum State Tomography (QST), evaluated on GHZ, W, and product states across 3-qubit systems &ndash; scaling up to 8 qubits to expose MLE's computational limits and assess VAE as a practical, scalable alternative.
 
 > Final project for the course *Statistics and Data Analysis* 2025–2026  
 > M.Sc. in Physics — University of Milano-Bicocca
@@ -20,12 +19,12 @@ A systematic comparison of **Maximum Likelihood Estimation (MLE)** and **Variati
 
 ## Overview
 
-Quantum State Tomography is a fundamental protocol in the NISQ era, used for gate benchmarking, noise mitigation verification, and fidelity estimation of prepared states. Classical reconstruction methods suffer from the **curse of dimensionality** — the Hilbert space grows exponentially with the number of qubits, making full density matrix reconstruction computationally prohibitive.
+Quantum State Tomography is a fundamental protocol in the NISQ era, used for gate benchmarking, noise mitigation verification, and fidelity estimation of prepared states. Classical reconstruction methods suffer from the **curse of dimensionality**: the Hilbert space grows exponentially with the number of qubits, making full density matrix reconstruction computationally prohibitive.
 
 This project implements and compares two approaches:
 
-- **MLE** — Maximum Likelihood Estimation via Cholesky parametrization, optimized with `iminuit` (Migrad algorithm)
-- **VAE** — Variational Autoencoder trained on POVM measurement outcomes to learn the Born probability distribution directly, bypassing explicit density matrix reconstruction
+- **MLE**: Maximum Likelihood Estimation via Cholesky parametrization, optimized with `iminuit` (Migrad algorithm)
+- **VAE**: Variational Autoencoder &ndash; via `keras` package &ndash; trained on POVM measurement outcomes to learn the Born probability distribution directly, bypassing explicit density matrix reconstruction
 
 Both methods are evaluated using **Classical Fidelity** (Bhattacharyya coefficient) as the primary metric, enabling a fair direct comparison without requiring full state reconstruction.
 
@@ -36,7 +35,7 @@ Both methods are evaluated using **Classical Fidelity** (Bhattacharyya coefficie
 ```
 statistical-qst-vae/
 ├── data/               # CSV files with simulation results
-├── docs/               # Project report (LaTeX/PDF)
+├── docs/               # Project report (PDF)
 ├── figs/               # Generated figures and plots
 ├── notebooks/
 │   ├── 01_demo_GHZ3.ipynb      # General demo on proposed methods
