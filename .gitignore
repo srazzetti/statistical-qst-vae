@@ -228,6 +228,9 @@ results/
 # Archives
 *.zip
 
+# Plots file
+fig.py
+
 # SHARED-DRIVE repo files: 
 # to easily use colab vm
 git_utils.sh
